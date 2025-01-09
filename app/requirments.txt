@@ -1,0 +1,9 @@
+fastapi[standard]
+uvicorn
+sqlalchemy
+pymysql
+python-keycloak 
+fastapi-keycloak 
+python-jose[cryptography]
+passlib 
+bcrypt
