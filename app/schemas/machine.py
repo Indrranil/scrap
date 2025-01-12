@@ -9,9 +9,7 @@ class MachineType(str, Enum):
 
 class MachineBase(BaseModel):
     mid: str
-    factory_id: str
-    plant_id: str
-    location: str
+    machine_name: str
     machine_type: MachineType
     is_usable: int = 1
 

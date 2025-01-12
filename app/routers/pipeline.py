@@ -43,3 +43,34 @@ async def create_pipeline(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    
+@router.put("/{pipeline_id}",response_model=PipelineResponse)
+async def put_pipeline(
+    pipeline_id: int,
+    pipeline: PipelineBase,
+    db: Session = Depends(get_db),
+    _: bool = require_permission("read:pipeline")
+):
+    db_pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not db_pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    
+    for key,value in pipeline.dict().items():
+        setattr(db_pipeline,key,value)
+    db.commit()
+    db.refresh(db_pipeline)
+    return db_pipeline
+
+@router.delete("/{pipeline_id}")
+async def delete_pipeline(
+    pipeline_id:int,
+    db: Session = Depends(get_db),
+    _: bool = require_permission("delete:pipeline")
+):
+    db_pipeline = db.query(Pipeline).filter(Pipeline.id == pipeline_id).first()
+    if not db_pipeline:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    
+    db.delete(db_pipeline)
+    db.commit()
+    return {"Message":"Pipeline deleted successfully"}

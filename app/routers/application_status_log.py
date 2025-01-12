@@ -34,3 +34,24 @@ def get_container_status_logs(container_id: str, db: Session = Depends(get_db)):
         ApplicationStatusLog.application_container_id == container_id
     ).order_by(ApplicationStatusLog.created_at.desc()).all()
     return status_logs
+
+@router.put("/{log_id}",response_model=ApplicationStatusLogResponse)
+def update_status_log(log_id:int,status_log:ApplicationStatusLogCreate,db: Session = Depends(get_db)):
+    db_status = db.query(ApplicationStatusLog).filter(ApplicationStatusLog.id == log_id).first()
+    if not status_log:
+        raise HTTPException(status_code=404, detail="Status log not found")
+    for key,value in status_log.dict().items():
+        setattr(db_status,key,value)
+    db.commit()
+    db.refresh(db_status)
+    return db_status
+
+@router.delete("/{log_id}")
+def delete_status_log(log_id:int,db: Session = Depends(get_db)):
+    db_status = db.query(ApplicationStatusLog).filter(ApplicationStatusLog.id == log_id).first()
+    if not status_log:
+        raise HTTPException(status_code=404, detail="Status log not found")
+    
+    db.delete(db_status)
+    db.commit()
+    return {"Message":"Status Log deleted successfully"}

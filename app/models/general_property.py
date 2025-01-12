@@ -6,6 +6,7 @@ class GeneralProperty(Base):
     id = Column(Integer, primary_key=True, index=True)
     referrer_id = Column(Integer)
     property_type = Column(Enum('machine', 'pipeline', 'application', 'pipeline_input'))
+    property_label = Column(String(255))
     property_key = Column(String(255))
     property_value = Column(String(255))
     created_at = Column(BigInteger)

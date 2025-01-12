@@ -15,7 +15,8 @@ from routers.machine import router as machine_router
 from routers.pipeline import router as pipeline_router
 from routers.pipeline_input_referrer import router as pipeline_input_referrer_router
 from routers.pipeline_input import router as pipeline_input_router
-
+from routers.product_upload import router as product_upload_router
+from routers.device import router as device_router
 
 
 
@@ -29,22 +30,24 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(KeycloakMiddleware)
+# app.add_middleware(KeycloakMiddleware)
 
 # ROUTERS
-app.include_router(application_container_router)
-app.include_router(application_output_type_router)
-app.include_router(application_session_unit_output_router)
-app.include_router(application_session_unit_router)
-app.include_router(application_session_router)
-app.include_router(application_router)
-app.include_router(application_status_log_router)
-app.include_router(general_property_router)
-app.include_router(machine_router)
-app.include_router(pipeline_router)
-app.include_router(pipeline_input_referrer_router)
-app.include_router(pipeline_input_router)
+# app.include_router(application_container_router)
+# app.include_router(application_output_type_router)
+# app.include_router(application_session_unit_output_router)
+# app.include_router(application_session_unit_router)
+# app.include_router(application_session_router)
+# app.include_router(application_router)
+# app.include_router(application_status_log_router)
+# app.include_router(general_property_router)
+# app.include_router(machine_router)
+# app.include_router(pipeline_router)
+# app.include_router(pipeline_input_referrer_router)
+# app.include_router(pipeline_input_router)
 
+app.include_router(product_upload_router)
+app.include_router(device_router)
 
 Base.metadata.create_all(bind=engine)
 

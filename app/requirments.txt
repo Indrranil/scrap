@@ -7,3 +7,5 @@ fastapi-keycloak
 python-jose[cryptography]
 passlib 
 bcrypt
+pyjwt
+keycloak
