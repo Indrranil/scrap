@@ -17,6 +17,8 @@ from routers.pipeline_input_referrer import router as pipeline_input_referrer_ro
 from routers.pipeline_input import router as pipeline_input_router
 from routers.product_upload import router as product_upload_router
 from routers.device import router as device_router
+from routers.users import router as user_router
+from routers.property import router as property_router
 
 
 
@@ -48,6 +50,8 @@ app.add_middleware(
 
 app.include_router(product_upload_router)
 app.include_router(device_router)
+app.include_router(user_router)
+app.include_router(property_router)
 
 Base.metadata.create_all(bind=engine)
 
