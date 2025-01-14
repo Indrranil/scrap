@@ -23,14 +23,14 @@ async def create_user(user_data: UserCreate):
     try:
         # Create user without roles first
         user = {
-            "username": user_data["username"],
-            "email": user_data["email"],
+            "username": user_data.username,  
+            "email": user_data.email,
             "enabled": True,
-            "firstName": user_data["firstName"],
-            "lastName": user_data["lastName"],
+            "firstName": user_data.firstName,
+            "lastName": user_data.lastName,
             "credentials": [{
                 "type": "password",
-                "value": user_data["password"],
+                "value": user_data.password,
                 "temporary": False
             }]
         }
