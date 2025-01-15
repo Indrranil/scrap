@@ -11,10 +11,21 @@ class UserCreate(BaseModel):
     roles: Optional[List[str]] = []
 
 class UserResponse(BaseModel):
+    id: str
     username: str
-    firstName: str
-    lastName: str
+    firstName: Optional[str] = ''
+    lastName: Optional[str] = ''
+    email: Optional[str] = ''
+    enabled: Optional[bool] = True
 
 class UsersListResponse(BaseModel):
     total: int
     users: List[UserResponse]
+    
+class UserUpdate(BaseModel):
+    username: Optional[str] = None
+    email: Optional[EmailStr] = None
+    firstName: Optional[str] = None
+    lastName: Optional[str] = None
+    password: Optional[str] = None
+    roles: Optional[List[str]] = None

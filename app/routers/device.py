@@ -437,3 +437,186 @@ async def get_all_devices(db: Session = Depends(get_db)):
             status_code=500,
             detail=f"Error fetching devices: {str(e)}"
         )
+        
+@router.put("/{device_id}")
+async def update_device(
+    device_id: int,
+    device: DeviceUploadCreate,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Start transaction
+        db.begin()
+
+        # Get existing device
+        existing_device = db.query(Machine).filter(
+            Machine.id == device_id,
+            Machine.is_usable == 1
+        ).first()
+
+        if not existing_device:
+            raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
+
+        # Validate device type
+        mapped_type = DEVICE_TYPE_MAPPING.get(device.machine_type.lower())
+        if not mapped_type:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid device type: {device.machine_type}. Must be one of: {', '.join(DEVICE_TYPE_MAPPING.keys())}"
+            )
+
+        timestamp = int(time.time())
+        properties_list = []
+
+        # Update device details
+        existing_device.machine_name = device.machine_name.lower()
+        existing_device.machine_type = mapped_type
+        db.flush()
+
+        # Set all existing properties as not usable
+        db.query(GeneralProperty).filter(
+            GeneralProperty.referrer_id == device_id,
+            GeneralProperty.property_type == "machine",
+            GeneralProperty.is_usable == 1
+        ).update({"is_usable": 0})
+
+        # Add network properties
+        network_properties = {
+            "ip_address": device.ip_address,
+            "mac_address": device.mac_address
+        }
+        
+        for property_label, property_value in network_properties.items():
+            if property_value and str(property_value).strip():
+                network_entity = GeneralProperty(
+                    referrer_id=device_id,
+                    property_type="machine",
+                    property_key="network",
+                    property_label=property_label,
+                    property_value=str(property_value).lower(),
+                    created_at=timestamp,
+                    is_usable=1
+                )
+                db.add(network_entity)
+                db.flush()
+                
+                properties_list.append({
+                    "id": network_entity.id,
+                    "property_label": property_label,
+                    "property_key": "network",
+                    "property_value": str(property_value).lower(),
+                    "created_at": timestamp
+                })
+
+        # Add communication properties
+        communication_properties = {
+            "baud_rate": device.baud_rate,
+            "starting_address": device.starting_address
+        }
+        
+        for property_label, property_value in communication_properties.items():
+            if property_value and str(property_value).strip():
+                comm_entity = GeneralProperty(
+                    referrer_id=device_id,
+                    property_type="machine",
+                    property_key="communication",
+                    property_label=property_label,
+                    property_value=str(property_value).lower(),
+                    created_at=timestamp,
+                    is_usable=1
+                )
+                db.add(comm_entity)
+                db.flush()
+                
+                properties_list.append({
+                    "id": comm_entity.id,
+                    "property_label": property_label,
+                    "property_key": "communication",
+                    "property_value": str(property_value).lower(),
+                    "created_at": timestamp
+                })
+
+        # Add device type property
+        device_type_entity = GeneralProperty(
+            referrer_id=device_id,
+            property_type="machine",
+            property_key="specifications",
+            property_label="device_type",
+            property_value=mapped_type,
+            created_at=timestamp,
+            is_usable=1
+        )
+        db.add(device_type_entity)
+        db.flush()
+
+        properties_list.append({
+            "id": device_type_entity.id,
+            "property_label": "device_type",
+            "property_key": "specifications",
+            "property_value": mapped_type,
+            "created_at": timestamp
+        })
+
+        db.commit()
+
+        return {
+            "id": existing_device.id,
+            "name": existing_device.machine_name,
+            "created_at": existing_device.created_at,
+            "properties": properties_list
+        }
+
+    except HTTPException as he:
+        db.rollback()
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error updating device: {str(e)}"
+        )
+
+@router.delete("/{device_id}")
+async def delete_device(
+    device_id: int,
+    db: Session = Depends(get_db)
+):
+    try:
+        # Start transaction
+        db.begin()
+
+        # Get existing device
+        device = db.query(Machine).filter(
+            Machine.id == device_id,
+            Machine.is_usable == 1
+        ).first()
+
+        if not device:
+            raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
+
+        # Soft delete the device
+        device.is_usable = 0
+
+        # Soft delete all associated properties
+        db.query(GeneralProperty).filter(
+            GeneralProperty.referrer_id == device_id,
+            GeneralProperty.property_type == "machine",
+            GeneralProperty.is_usable == 1
+        ).update({"is_usable": 0})
+
+        db.commit()
+
+        return {
+            "message": f"Device with ID {device_id} successfully deleted",
+            "name": device.machine_name
+        }
+
+    except HTTPException as he:
+        db.rollback()
+        raise he
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error deleting device: {str(e)}"
+        )

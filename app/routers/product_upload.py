@@ -451,3 +451,211 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
             status_code=500,
             detail=f"Error fetching properties: {str(e)}"
         )
+        
+@router.put("/{product_id}")
+async def update_product(
+    product_id: int,
+    data: ProductUploadCreate,
+    db: Session = Depends(get_db),
+):
+    try:
+        # Start transaction
+        db.begin()
+
+        # 1. Get existing pipeline input
+        pipeline_input = db.query(PipelineInput).filter(
+            PipelineInput.id == product_id,
+            PipelineInput.is_usable == 1
+        ).first()
+
+        if not pipeline_input:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # Update pipeline input name if changed
+        if pipeline_input.name != data.variant_name.lower():
+            pipeline_input.name = data.variant_name.lower()
+            db.flush()
+
+        timestamp = int(time.time())
+        properties_list = []
+
+        # 2. Update CLD Barcode Reference
+        cld_referrer = db.query(PipelineInputReferrer).filter(
+            PipelineInputReferrer.pipeline_input_id == product_id,
+            PipelineInputReferrer.key == "cld_barcode",
+            PipelineInputReferrer.is_usable == 1
+        ).first()
+
+        if cld_referrer:
+            cld_referrer.value = data.cld_barcode.lower()
+            cld_referrer.created_at = timestamp
+        else:
+            cld_referrer = PipelineInputReferrer(
+                key="cld_barcode",
+                value=data.cld_barcode.lower(),
+                pipeline_input_id=pipeline_input.id,
+                created_at=timestamp,
+                is_usable=1
+            )
+            db.add(cld_referrer)
+        db.flush()
+
+        properties_list.append({
+            "id": cld_referrer.id,
+            "property_label": "CLD Barcode",
+            "property_key": "cld_barcode",
+            "property_value": cld_referrer.value,
+            "created_at": cld_referrer.created_at
+        })
+
+        # 3. Update basic properties
+        basic_properties = {
+            "material": {
+                "Front": data.material_code_front,
+                "Back": data.material_code_back
+            },
+            "coding": {
+                "Factory Code": data.factory_code,
+                "Price": data.price,
+                "USP": data.usp,
+                "Manufacturing Date": data.manufacturing_date,
+                "Expiry Date": data.expiry_date,
+            },
+            "specifications": {
+                "target_weight": str(data.target_weight) if data.target_weight is not None else None,
+                "tare_weight": str(data.tare_weight) if data.tare_weight is not None else None,
+                "FORM FACTOR": data.form_factor
+            },
+            "identifiers": {
+                "product_name": data.product_name,
+                "variant_barcode": data.variant_barcode
+            }
+        }
+
+        # Set all existing properties as not usable
+        db.query(GeneralProperty).filter(
+            GeneralProperty.referrer_id == product_id,
+            GeneralProperty.property_type == "pipeline_input",
+            GeneralProperty.is_usable == 1
+        ).update({"is_usable": 0})
+
+        # Add updated properties
+        for group_key, group_properties in basic_properties.items():
+            for property_label, property_value in group_properties.items():
+                if property_value is not None:
+                    property_entity = GeneralProperty(
+                        referrer_id=pipeline_input.id,
+                        property_type="pipeline_input",
+                        property_key=group_key,
+                        property_label=property_label,
+                        property_value=str(property_value),
+                        created_at=timestamp,
+                        is_usable=1
+                    )
+                    db.add(property_entity)
+                    db.flush()
+                    
+                    properties_list.append({
+                        "id": property_entity.id,
+                        "property_label": property_entity.property_label,
+                        "property_key": property_entity.property_key,
+                        "property_value": property_entity.property_value,
+                        "created_at": property_entity.created_at
+                    })
+
+        # 4. Handle PQS properties if form factor is norden
+        if data.form_factor and data.form_factor.lower() == "norden":
+            pqs_properties = {
+                "front_face": str(data.front_face) if data.front_face is not None else "1",
+                "back_face": str(data.back_face) if data.back_face is not None else "1",
+                "left_face": str(data.left_face) if data.left_face is not None else "1",
+                "right_face": str(data.right_face) if data.right_face is not None else "1",
+                "top_face": str(data.top_face) if data.top_face is not None else "1",
+                "bottom_face": str(data.bottom_face) if data.bottom_face is not None else "1",
+                "damage": data.damage if data.damage is not None else "",
+                "flap_open": data.flap_open if data.flap_open is not None else "",
+                "grease_dirt": data.grease_dirt if data.grease_dirt is not None else "",
+                "color_mismatch": data.color_mismatch if data.color_mismatch is not None else ""
+            }
+
+            for is_tube in [False, True]:
+                property_key = "pqs_tube" if is_tube else "pqs_carton"
+                is_usable = 0 if is_tube else 1
+
+                for label, value in pqs_properties.items():
+                    pqs_entity = GeneralProperty(
+                        referrer_id=pipeline_input.id,
+                        property_type="pipeline_input",
+                        property_key=property_key,
+                        property_label=label,
+                        property_value=str(value),
+                        created_at=timestamp,
+                        is_usable=is_usable
+                    )
+                    db.add(pqs_entity)
+                    db.flush()
+
+                    if is_usable == 1:
+                        properties_list.append({
+                            "id": pqs_entity.id,
+                            "property_label": label,
+                            "property_key": property_key,
+                            "property_value": str(value),
+                            "created_at": timestamp
+                        })
+
+        # Commit the transaction
+        db.commit()
+        
+        return {
+            "id": pipeline_input.id,
+            "name": pipeline_input.name,
+            "created_at": pipeline_input.created_at,
+            "properties": properties_list
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{product_id}")
+async def delete_product(
+    product_id: int,
+    db: Session = Depends(get_db),
+):
+    try:
+        # Start transaction
+        db.begin()
+
+        # 1. Get pipeline input
+        pipeline_input = db.query(PipelineInput).filter(
+            PipelineInput.id == product_id,
+            PipelineInput.is_usable == 1
+        ).first()
+
+        if not pipeline_input:
+            raise HTTPException(status_code=404, detail="Product not found")
+
+        # 2. Soft delete pipeline input
+        pipeline_input.is_usable = 0
+
+        # 3. Soft delete all associated properties
+        db.query(PipelineInputReferrer).filter(
+            PipelineInputReferrer.pipeline_input_id == product_id,
+            PipelineInputReferrer.is_usable == 1
+        ).update({"is_usable": 0})
+
+        db.query(GeneralProperty).filter(
+            GeneralProperty.referrer_id == product_id,
+            GeneralProperty.property_type == "pipeline_input",
+            GeneralProperty.is_usable == 1
+        ).update({"is_usable": 0})
+
+        # Commit the transaction
+        db.commit()
+
+        return {"message": "Product successfully deleted"}
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
