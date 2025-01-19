@@ -4,7 +4,7 @@ USE app_db;
 CREATE TABLE `machine` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `mid` varchar(255),
-  `machine_name` varchar(255),
+  `name` varchar(255),
   `machine_type` ENUM ('camera', 'server', 'rejector'),
   `created_at` bigint,
   `is_usable` int
@@ -28,13 +28,7 @@ CREATE TABLE `general_property` (
   `property_label` varchar(255),
   `property_key` varchar(255),
   `property_value` varchar(255),
-  `created_at` bigint,
-  `is_usable` int
-);
-
-CREATE TABLE `pipeline` (
-  `id` int PRIMARY KEY AUTO_INCREMENT,
-  `name` varchar(255),
+  `tags` varchar(255) COMMENT 'Can be used to store some additional context',
   `created_at` bigint,
   `is_usable` int
 );
@@ -42,8 +36,15 @@ CREATE TABLE `pipeline` (
 CREATE TABLE `application` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `name` varchar(255),
+  `created_at` bigint,
+  `is_usable` int
+);
+
+CREATE TABLE `pipeline` (
+  `id` int PRIMARY KEY AUTO_INCREMENT,
+  `name` varchar(255),
   `is_running` int,
-  `pipeline_id` int,
+  `application_id` int,
   `created_at` bigint,
   `is_usable` int
 );
@@ -64,9 +65,9 @@ CREATE TABLE `pipeline_input_referrer` (
   `is_usable` int
 );
 
-CREATE TABLE `application_session` (
+CREATE TABLE `pipeline_session` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
-  `application_id` int,
+  `pipeline_id` int,
   `pipeline_input_id` int,
   `name` varchar(255),
   `created_by` int,
@@ -75,22 +76,23 @@ CREATE TABLE `application_session` (
   `is_usable` int
 );
 
-CREATE TABLE `application_session_unit` (
+CREATE TABLE `pipeline_session_output` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
-  `application_session_id` int,
+  `pipeline_session_id` int,
   `name` varchar(255),
   `created_at` bigint,
   `ended_at` bigint,
   `is_usable` int
 );
 
-CREATE TABLE `application_session_unit_output` (
+CREATE TABLE `pipeline_session_output_unit` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
-  `application_session_unit_id` int,
+  `pipeline_session_output_id` int,
   `property_reference_id` int,
   `name` varchar(255),
   `output_key` varchar(255),
   `output_value` varchar(255),
+  `status` ENUM ('idle', 'ready', 'analysing', 'success', 'error'),
   `created_at` bigint,
   `is_usable` int
 );
@@ -108,31 +110,11 @@ CREATE TABLE `application_status_log` (
   `created_at` bigint
 );
 
--- ALTER TABLE `general_property` 
--- ADD CONSTRAINT `fk_general_property_machine` 
--- FOREIGN KEY (`referrer_id`) 
--- REFERENCES `machine` (`id`);
+ALTER TABLE `pipeline_session` ADD FOREIGN KEY (`pipeline_id`) REFERENCES `application` (`id`);
 
--- ALTER TABLE `general_property` 
--- ADD CONSTRAINT `fk_general_property_pipeline` 
--- FOREIGN KEY (`referrer_id`) 
--- REFERENCES `pipeline` (`id`);
+ALTER TABLE `pipeline_session_output` ADD FOREIGN KEY (`pipeline_session_id`) REFERENCES `pipeline_session` (`id`);
 
--- ALTER TABLE `general_property` 
--- ADD CONSTRAINT `fk_general_property_application` 
--- FOREIGN KEY (`referrer_id`) 
--- REFERENCES `application` (`id`);
-
--- ALTER TABLE `general_property` 
--- ADD CONSTRAINT `fk_general_property_pipeline_input` 
--- FOREIGN KEY (`referrer_id`) 
--- REFERENCES `pipeline_input` (`id`);
-
-ALTER TABLE `application_session` ADD FOREIGN KEY (`application_id`) REFERENCES `application` (`id`);
-
-ALTER TABLE `application_session_unit` ADD FOREIGN KEY (`application_session_id`) REFERENCES `application_session` (`id`);
-
-ALTER TABLE `application_session_unit_output` ADD FOREIGN KEY (`application_session_unit_id`) REFERENCES `application_session_unit` (`id`);
+ALTER TABLE `pipeline_session_output_unit` ADD FOREIGN KEY (`pipeline_session_output_id`) REFERENCES `pipeline_session_output` (`id`);
 
 ALTER TABLE `application_container` ADD FOREIGN KEY (`application_id`) REFERENCES `application` (`id`);
 
@@ -140,8 +122,7 @@ ALTER TABLE `pipeline_input_referrer` ADD FOREIGN KEY (`pipeline_input_id`) REFE
 
 ALTER TABLE `application_status_log` ADD FOREIGN KEY (`application_container_id`) REFERENCES `application_container` (`id`);
 
-ALTER TABLE `application_session_unit_output` ADD FOREIGN KEY (`property_reference_id`) REFERENCES `general_property` (`id`);
-
+ALTER TABLE `pipeline_session_output_unit` ADD FOREIGN KEY (`property_reference_id`) REFERENCES `general_property` (`id`);
 
 
 CREATE DATABASE IF NOT EXISTS keycloak_db;

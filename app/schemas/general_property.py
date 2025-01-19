@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, Optional
 
 class GeneralPropertyBase(BaseModel):
     referrer_id: int
@@ -7,6 +7,7 @@ class GeneralPropertyBase(BaseModel):
     property_label: str
     property_key: str
     property_value: str
+    tags: Optional[str] = ""
     is_usable: int = 1
 
 class GeneralPropertyResponse(GeneralPropertyBase):

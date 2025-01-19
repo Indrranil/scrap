@@ -3,13 +3,13 @@ from enum import Enum
 from typing import Optional
 
 class MachineType(str, Enum):
-    camera = "camera"
-    server = "server"
+    weight_machine = "weight machine"
+    perforation = "perforation"
     rejector = "rejector"
 
 class MachineBase(BaseModel):
     mid: str
-    machine_name: str
+    name: str
     machine_type: MachineType
     is_usable: int = 1
 

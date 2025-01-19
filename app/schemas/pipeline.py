@@ -1,10 +1,15 @@
 from pydantic import BaseModel
 
 class PipelineBase(BaseModel):
-   name: str
-   is_usable: int = 1
+    name: str
+    is_running: int
+    application_id: int
+    is_usable: int
 
-class PipelineResponse(PipelineBase):
+class PipelineCreate(PipelineBase):
+    pass
+
+class Pipeline(PipelineBase):
    id: int
    created_at: int
    

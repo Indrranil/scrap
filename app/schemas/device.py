@@ -4,18 +4,18 @@ from typing import Optional
 from enum import Enum
 
 class MachineType(str, Enum):
-    camera = "camera"
-    server = "server"
+    weight_machine = "weight machine"
+    perforation = "perforation"
     rejector = "rejector"
 
 DEVICE_TYPE_MAPPING = {
-    "type 1": "camera",
-    "type 2": "server",
+    "type 1": "weight machine",
+    "type 2": "perforation",
     "type 3": "rejector"
 }
 
 class DeviceUploadCreate(BaseModel):
-    machine_name: str = Field(..., alias="Device Name")
+    name: str = Field(..., alias="Device Name")
     ip_address: str = Field(..., alias="IP Address")
     mac_address: str = Field(..., alias="Mac Address")
     machine_type: str = Field(..., alias="Device Type")
@@ -30,7 +30,7 @@ class DeviceUploadCreate(BaseModel):
 class DeviceResponse(BaseModel):
     id: int
     mid: str
-    machine_name: str
+    name: str
     machine_type: MachineType
     created_at: int
     properties: dict

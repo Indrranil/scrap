@@ -12,61 +12,19 @@ from models.general_property import GeneralProperty
 
 router = APIRouter(prefix="/v1/device", tags=["device"])
 
-def generate_mid(machine_name: str) -> str:
+def generate_mid(name: str) -> str:
     """Generate standardized MID based on device name"""
-    name_lower = machine_name.lower().replace(" ", "")
+    name_lower = name.lower().replace(" ", "")
     
     if "weight" in name_lower:
-        prefix = "wm"
+        prefix = "W"
     elif "perforation" in name_lower:
-        prefix = "p"
+        prefix = "P"
     else:
-        prefix = "d"
+        prefix = "R"
     
     suffix = str(int(time.time()))[-6:]
     return f"{prefix}_{suffix}"
-
-def create_device_properties(
-    db: Session,
-    device_id: int,
-    network_data: Dict[str, str],
-    communication_data: Dict[str, str],
-    timestamp: int
-) -> Dict[str, str]:
-    """Create device properties in general_property table"""
-    properties_dict = {}
-    
-    # Network properties
-    for property_label, property_value in network_data.items():
-        if property_value and str(property_value).strip():
-            property_entity = GeneralProperty(
-                referrer_id=device_id,
-                property_type="machine",
-                property_key="network",
-                property_label=property_label.lower(),
-                property_value=str(property_value).lower(),
-                created_at=timestamp,
-                is_usable=1
-            )
-            db.add(property_entity)
-            properties_dict[f"network_{property_label}"] = property_value
-
-    # Communication properties
-    for property_label, property_value in communication_data.items():
-        if property_value and str(property_value).strip():
-            property_entity = GeneralProperty(
-                referrer_id=device_id,
-                property_type="machine",
-                property_key="communication",
-                property_label=property_label.lower(),
-                property_value=str(property_value).lower(),
-                created_at=timestamp,
-                is_usable=1
-            )
-            db.add(property_entity)
-            properties_dict[f"communication_{property_label}"] = property_value
-
-    return properties_dict
 
 @router.post("/")
 async def create_device(
@@ -89,7 +47,7 @@ async def create_device(
 
         # Check if device exists
         existing_device = db.query(Machine).filter(
-            Machine.machine_name == device.machine_name.lower(),
+            Machine.name == device.name.lower(),
             Machine.is_usable == 1
         ).first()
 
@@ -98,9 +56,9 @@ async def create_device(
             device_response = existing_device
         else:
             # Generate standardized MID and create new device
-            generated_mid = generate_mid(device.machine_name)
+            generated_mid = generate_mid(device.name)
             new_device = Machine(
-                machine_name=device.machine_name.lower(),
+                name=device.name.lower(),
                 mid=generated_mid,
                 machine_type=mapped_type,
                 created_at=timestamp,
@@ -194,7 +152,7 @@ async def create_device(
             "total": 1,
             "items": [{
                 "id": device_response.id,
-                "name": device_response.machine_name,
+                "name": device_response.name,
                 "created_at": device_response.created_at,
                 "properties": properties_list
             }]
@@ -246,7 +204,7 @@ async def create_bulk_device_upload(
             try:
                 with db.begin_nested():
                     device_data = DeviceUploadCreate(
-                        machine_name=str(row["device_name"]).strip(),
+                        name=str(row["name"]).strip(),
                         ip_address=str(row["ip_address"]).strip(),
                         mac_address=str(row["mac_address"]).strip(),
                         machine_type=str(row["device_type"]).strip(),
@@ -263,16 +221,16 @@ async def create_bulk_device_upload(
 
                     # Create or get existing device
                     existing_device = db.query(Machine).filter(
-                        Machine.machine_name == device_data.machine_name.lower(),
+                        Machine.name == device_data.name.lower(),
                         Machine.is_usable == 1
                     ).first()
 
                     if existing_device:
                         device = existing_device
                     else:
-                        generated_mid = generate_mid(device_data.machine_name)
+                        generated_mid = generate_mid(device_data.name)
                         device = Machine(
-                            machine_name=device_data.machine_name.lower(),
+                            name=device_data.name.lower(),
                             mid=generated_mid,
                             machine_type=mapped_type,
                             created_at=timestamp,
@@ -360,7 +318,7 @@ async def create_bulk_device_upload(
 
                     successful_items.append({
                         "id": device.id,
-                        "name": device.machine_name,
+                        "name": device.name,
                         "created_at": device.created_at,
                         "properties": properties_list
                     })
@@ -368,7 +326,7 @@ async def create_bulk_device_upload(
             except Exception as e:
                 failed_items.append({
                     "row": index + 2,
-                    "machine_name": row.get("device_name", "Unknown"),
+                    "name": row.get("name", "Unknown"),
                     "error": str(e)
                 })
                 continue
@@ -422,7 +380,7 @@ async def get_all_devices(db: Session = Depends(get_db)):
             
             items.append({
                 "id": device.id,
-                "name": device.machine_name,
+                "name": device.name,
                 "created_at": device.created_at,
                 "properties": properties
             })
@@ -469,7 +427,7 @@ async def update_device(
         properties_list = []
 
         # Update device details
-        existing_device.machine_name = device.machine_name.lower()
+        existing_device.name = device.name.lower()
         existing_device.machine_type = mapped_type
         db.flush()
 
@@ -536,7 +494,7 @@ async def update_device(
                     "created_at": timestamp
                 })
 
-        # Add device type property
+
         device_type_entity = GeneralProperty(
             referrer_id=device_id,
             property_type="machine",
@@ -561,7 +519,7 @@ async def update_device(
 
         return {
             "id": existing_device.id,
-            "name": existing_device.machine_name,
+            "name": existing_device.name,
             "created_at": existing_device.created_at,
             "properties": properties_list
         }
@@ -608,7 +566,7 @@ async def delete_device(
 
         return {
             "message": f"Device with ID {device_id} successfully deleted",
-            "name": device.machine_name
+            "name": device.name
         }
 
     except HTTPException as he:
