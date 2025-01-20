@@ -204,7 +204,7 @@ async def create_bulk_device_upload(
             try:
                 with db.begin_nested():
                     device_data = DeviceUploadCreate(
-                        name=str(row["name"]).strip(),
+                        name=str(row["device_name"]).strip(),
                         ip_address=str(row["ip_address"]).strip(),
                         mac_address=str(row["mac_address"]).strip(),
                         machine_type=str(row["device_type"]).strip(),

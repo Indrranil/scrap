@@ -5,7 +5,7 @@ CREATE TABLE `machine` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `mid` varchar(255),
   `name` varchar(255),
-  `machine_type` ENUM ('camera', 'server', 'rejector'),
+  `machine_type` ENUM ('weight_machine', 'perforation', 'rejector'),
   `created_at` bigint,
   `is_usable` int
 );

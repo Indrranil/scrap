@@ -4,12 +4,12 @@ from typing import Optional
 from enum import Enum
 
 class MachineType(str, Enum):
-    weight_machine = "weight machine"
+    weight_machine = "weight_machine"
     perforation = "perforation"
     rejector = "rejector"
 
 DEVICE_TYPE_MAPPING = {
-    "type 1": "weight machine",
+    "type 1": "weight_machine",
     "type 2": "perforation",
     "type 3": "rejector"
 }
