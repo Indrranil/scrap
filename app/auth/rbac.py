@@ -1,8 +1,6 @@
-# app/middleware/rbac.py
 from functools import wraps
 from fastapi import HTTPException, Request, Depends
 from config.permissions import ROLE_PERMISSIONS
-from functools import partial
 
 def has_permission(user_roles: list, required_permission: str) -> bool:
     user_permissions = []
@@ -11,7 +9,7 @@ def has_permission(user_roles: list, required_permission: str) -> bool:
     return (required_permission in user_permissions) or ('all' in user_permissions)
 
 def require_permission(required_permission: str):
-    async def dependency(request: Request):
+    def dependency(request: Request):
         user_roles = getattr(request.state, "user_roles", [])
         if not has_permission(user_roles, required_permission):
             raise HTTPException(
@@ -19,4 +17,4 @@ def require_permission(required_permission: str):
                 detail=f"Insufficient permissions. Required: {required_permission}"
             )
         return True
-    return Depends(dependency)
+    return dependency

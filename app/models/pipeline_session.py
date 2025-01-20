@@ -1,14 +1,15 @@
-from sqlalchemy import Column, Integer, String, BigInteger
+# models/pipeline_session.py
+from sqlalchemy import Column, Integer, String, ForeignKey
 from database.connection import Base
 
 class PipelineSession(Base):
     __tablename__ = "pipeline_session"
 
-    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    pipeline_id = Column(Integer, ForeignKey('pipeline.id'))
-    pipeline_input_id = Column(Integer, ForeignKey('pipeline_input.id'))
-    name = Column(String(255))
+    id = Column(Integer, primary_key=True, index=True)
+    pipeline_id = Column(Integer, ForeignKey("application.id"))  # Changed from application_id
+    pipeline_input_id = Column(Integer)
+    name = Column(String)
     created_by = Column(Integer)
-    created_at = Column(BigInteger)
-    ended_at = Column(BigInteger)
-    is_usable = Column(Integer)
+    created_at = Column(Integer)
+    ended_at = Column(Integer, nullable=True)
+    is_usable = Column(Integer, default=1)

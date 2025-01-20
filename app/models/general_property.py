@@ -1,5 +1,6 @@
 from sqlalchemy import Column, Integer, String, BigInteger, Enum
 from database.connection import Base
+import enum
 
 class PropertyType(enum.Enum):
     machine = "machine"

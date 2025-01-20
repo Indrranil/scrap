@@ -1,4 +1,4 @@
-# app/middleware/auth.py
+# app/auth/auth.py
 from fastapi import Request, HTTPException
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from keycloak import KeycloakOpenID
@@ -13,7 +13,7 @@ class KeycloakMiddleware(BaseHTTPMiddleware):
             server_url="http://localhost:8080/",
             client_id="fastapi-client",
             realm_name="app-realm",
-            client_secret_key="lBgpLiCu6PoJTSjExg4GGu0fUGOPDV3a"
+            client_secret_key="bUvFqPkGPiP2F59KhslRGfUhCnTKtSvT"
         )
         self.bearer = HTTPBearer()
 
