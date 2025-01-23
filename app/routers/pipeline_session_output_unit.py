@@ -1,14 +1,16 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import time
 
 from database.connection import get_db
 from schemas.pipeline_session_output_unit import (
     PipelineSessionOutputUnitCreate, 
     PipelineSessionOutputUnit,
-    PipelineSessionOutputUnitUpdate
+    PipelineSessionOutputUnitUpdate,
+    PipelineSessionOutputUnitResponse,
+    BatchUpdateResponse
 )
 from models.pipeline_session_output_unit import PipelineSessionOutputUnit as PipelineSessionOutputUnitModel
 
@@ -74,7 +76,7 @@ async def get_pipeline_session_output_unit(
             detail=f"Error fetching pipeline session output unit: {str(e)}"
         )
 
-@router.get("/", response_model=List[PipelineSessionOutputUnit])
+@router.get("/", response_model=PipelineSessionOutputUnitResponse)
 async def get_all_pipeline_session_output_units(
     pipeline_session_output_id: int = Query(...),
     db: Session = Depends(get_db)
@@ -85,18 +87,18 @@ async def get_all_pipeline_session_output_units(
             PipelineSessionOutputUnitModel.is_usable == 1
         ).all()
         
-        return units
+        return {
+            "total": len(units),
+            "items": units
+        }
         
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching pipeline session output units: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))
 
-@router.patch("/{unit_id}", response_model=PipelineSessionOutputUnit)
+@router.patch("/", response_model=PipelineSessionOutputUnit)
 async def update_pipeline_session_output_unit(
-    unit_id: int,
     unit_update: PipelineSessionOutputUnitUpdate,
+    unit_id: int = Query(...),  # Using ... makes it required
     db: Session = Depends(get_db)
 ):
     try:
@@ -132,17 +134,15 @@ async def update_pipeline_session_output_unit(
             detail=f"Error updating pipeline session output unit: {str(e)}"
         )
 
-@router.patch("/all", response_model=List[PipelineSessionOutputUnit])
-async def update_all_pipeline_session_output_units(
+@router.patch("/all", response_model=BatchUpdateResponse)
+async def update_batch_pipeline_session_output_units(
     unit_update: PipelineSessionOutputUnitUpdate,
-    pipeline_session_output_id: Optional[int] = None,
-    output_key: Optional[str] = None,
+    pipeline_session_output_id: Optional[int] = Query(None),
+    output_key: Optional[str] = Query(None),
     db: Session = Depends(get_db)
 ):
     try:
         db.begin()
-        
-        # Build query based on parameters
         query = db.query(PipelineSessionOutputUnitModel).filter(
             PipelineSessionOutputUnitModel.is_usable == 1
         )
@@ -158,31 +158,22 @@ async def update_all_pipeline_session_output_units(
             )
             
         units = query.all()
-        
         if not units:
-            raise HTTPException(
-                status_code=404,
-                detail="No matching pipeline session output units found"
-            )
+            raise HTTPException(status_code=404, detail="No matching units found")
             
-        # Update all matching units
         update_data = unit_update.dict(exclude_unset=True)
-        for unit in units:
-            for key, value in update_data.items():
-                setattr(unit, key, value)
-            
+        query.update(update_data)
         db.commit()
         
-        # Refresh and return updated units
+        # Refresh the query to get updated units
         updated_units = query.all()
-        return updated_units
         
-    except HTTPException as he:
-        db.rollback()
-        raise he
+        return BatchUpdateResponse(
+            status="success",
+            updated_count=len(updated_units),
+            items=updated_units
+        )
+        
     except Exception as e:
         db.rollback()
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error updating pipeline session output units: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=str(e))

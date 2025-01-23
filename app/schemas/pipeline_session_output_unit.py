@@ -1,6 +1,6 @@
 # schemas/pipeline_session_output_unit.py
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel,ConfigDict
+from typing import Optional,List
 from enum import Enum
 
 class UnitStatus(str, Enum):
@@ -32,6 +32,15 @@ class PipelineSessionOutputUnit(PipelineSessionOutputUnitBase):
     id: int
     created_at: int
     is_usable: int
-
-    class Config:
-        from_attributes = True
+    
+    model_config = ConfigDict(from_attributes=True)  # This enables ORM mode
+        
+class PipelineSessionOutputUnitResponse(BaseModel):
+    total: int
+    items: List[PipelineSessionOutputUnitBase]
+    
+    
+class BatchUpdateResponse(BaseModel):
+    status: str
+    updated_count: int
+    items: List[PipelineSessionOutputUnit]
