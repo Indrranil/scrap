@@ -9,3 +9,6 @@ passlib
 bcrypt
 pyjwt
 keycloak
+pytest 
+pytest-asyncio 
+httpx
