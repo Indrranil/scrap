@@ -1,21 +1,16 @@
 from fastapi import FastAPI
 from database.connection import engine, Base
-from auth.auth import KeycloakMiddleware
+from auth.auth import AuthMiddleware
 from fastapi.middleware.cors import CORSMiddleware
 
-# ROUTERS 
-from routers.product_upload import router as product_upload_router
-from routers.device import router as device_router
-from routers.users import router as user_router
-from routers.property import router as property_router
+# Import routers
 from routers.pipeline_session import router as pipeline_session_router
-from routers.application import router as application_router
-from routers.pipeline_session_output import router as pipeline_session_output_router
-from routers.pipeline_session_output_unit import router as pipeline_session_output_unit_router
-
+from routers.signin import router as signin_router
+# ... other router imports ...
 
 app = FastAPI(title="Machine Management API")
 
+# CORS middleware
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -24,17 +19,23 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# app.add_middleware(KeycloakMiddleware)
+# Auth middleware
+app.add_middleware(AuthMiddleware)
 
+# Include routers
 app.include_router(pipeline_session_router)
-app.include_router(pipeline_session_output_router)
-app.include_router(pipeline_session_output_unit_router)
-app.include_router(product_upload_router)
-app.include_router(device_router)
-app.include_router(user_router)
-app.include_router(property_router)
-app.include_router(application_router)
+app.include_router(signin_router)
+# ... other routers ...
 
-
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        log_level="info"
+    )
