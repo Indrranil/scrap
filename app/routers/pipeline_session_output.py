@@ -15,8 +15,8 @@ router = APIRouter(prefix="/v1/pipeline-session-output", tags=["pipeline-session
 @router.post("/new", response_model=PipelineSessionOutput, status_code=201)
 async def create_pipeline_session_output(
     pipeline_session_output: PipelineSessionOutputCreate,
-    manual: Optional[int] = 0,
-    property_key: Optional[str] = None,
+    manual: Optional[int] = Query(0),
+    property_key: Optional[str] = Query(None, alias="property-key"),
     db: Session = Depends(get_db)
 ):
     try:
@@ -38,19 +38,15 @@ async def create_pipeline_session_output(
         
         # If manual mode, create output units
         if manual:
-            # Build property key filter if provided
-            property_filter = []
-            if property_key:
-                property_keys = [key.strip() for key in property_key.split(',')]
-                property_filter.append(GeneralProperty.property_key.in_(property_keys))
-            
-            # Get relevant properties
+            # Get relevant properties query
             query = db.query(GeneralProperty).filter(
                 GeneralProperty.is_usable == 1
             )
             
-            if property_filter:
-                query = query.filter(and_(*property_filter))
+            # Apply property key filter if provided
+            if property_key:
+                property_keys = [key.strip() for key in property_key.split(',')]
+                query = query.filter(GeneralProperty.property_key.in_(property_keys))
                 
             properties = query.all()
             

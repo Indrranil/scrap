@@ -94,6 +94,7 @@ def setup_general_property(db_session):
     db_session.refresh(test_property)
     return test_property
 
+
 def test_create_pipeline_session_verify_db(test_db, db_session, setup_application):
     """
     Test pipeline session creation and verify the database state
