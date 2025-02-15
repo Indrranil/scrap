@@ -9,7 +9,7 @@ from schemas.pipeline_session_output import PipelineSessionOutputCreate, Pipelin
 from models.pipeline_session_output import PipelineSessionOutput as PipelineSessionOutputModel
 from models.pipeline_session_output_unit import PipelineSessionOutputUnit
 from models.general_property import GeneralProperty
-
+from auth.auth import require_roles
 router = APIRouter(prefix="/v1/pipeline-session-output", tags=["pipeline-session-output"])
 
 @router.post("/new", response_model=PipelineSessionOutput, status_code=201)
@@ -17,7 +17,8 @@ async def create_pipeline_session_output(
     pipeline_session_output: PipelineSessionOutputCreate,
     manual: Optional[int] = Query(0),
     property_key: Optional[str] = Query(None, alias="property-key"),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         db.begin()
@@ -79,7 +80,8 @@ async def create_pipeline_session_output(
 async def get_pipeline_session_output(
     output_id: int,
     overview: int = Query(1),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         # Get base output data
@@ -122,7 +124,8 @@ async def get_pipeline_session_output(
 @router.get("/")
 async def get_all_pipeline_session_outputs(
     overview: int = Query(1),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         outputs = db.query(PipelineSessionOutputModel).filter(
