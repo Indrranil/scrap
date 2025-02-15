@@ -6,6 +6,8 @@ import time
 from database.connection import get_db
 from schemas.pipeline_session import PipelineSessionCreate, PipelineSession
 from models.pipeline_session import PipelineSession as PipelineSessionModel
+from models.pipeline_session_output import PipelineSessionOutput
+from models.pipeline_session_output_unit import PipelineSessionOutputUnit
 from auth.auth import require_roles
 
 router = APIRouter(prefix="/v1/pipeline-session", tags=["pipeline-session"])
