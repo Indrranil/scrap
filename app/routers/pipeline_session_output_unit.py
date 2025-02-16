@@ -13,13 +13,16 @@ from schemas.pipeline_session_output_unit import (
     BatchUpdateResponse
 )
 from models.pipeline_session_output_unit import PipelineSessionOutputUnit as PipelineSessionOutputUnitModel
+from auth.auth import require_roles
+
 
 router = APIRouter(prefix="/v1/pipeline-session-output-unit", tags=["pipeline-session-output-unit"])
 
 @router.post("/new", response_model=PipelineSessionOutputUnit, status_code=201)
 async def create_pipeline_session_output_unit(
     unit: PipelineSessionOutputUnitCreate,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         db.begin()
@@ -52,7 +55,8 @@ async def create_pipeline_session_output_unit(
 @router.get("/{unit_id}", response_model=PipelineSessionOutputUnit)
 async def get_pipeline_session_output_unit(
     unit_id: int,
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         unit = db.query(PipelineSessionOutputUnitModel).filter(
@@ -79,7 +83,8 @@ async def get_pipeline_session_output_unit(
 @router.get("/", response_model=PipelineSessionOutputUnitResponse)
 async def get_all_pipeline_session_output_units(
     pipeline_session_output_id: int = Query(...),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         units = db.query(PipelineSessionOutputUnitModel).filter(
@@ -99,7 +104,8 @@ async def get_all_pipeline_session_output_units(
 async def update_pipeline_session_output_unit(
     unit_update: PipelineSessionOutputUnitUpdate,
     unit_id: int = Query(...),  # Using ... makes it required
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         db.begin()
@@ -139,7 +145,8 @@ async def update_batch_pipeline_session_output_units(
     unit_update: PipelineSessionOutputUnitUpdate,
     pipeline_session_output_id: Optional[int] = Query(None),
     output_key: Optional[str] = Query(None),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         db.begin()

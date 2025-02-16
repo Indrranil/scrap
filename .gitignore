@@ -178,3 +178,4 @@ info.md
 data.txt
 machine_bulk.csv
 product_bulk.csv
+*.db
