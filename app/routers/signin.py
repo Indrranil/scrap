@@ -32,7 +32,7 @@ async def signin(credentials: SignInRequest):
         # Make request to Keycloak
         try:
             response = requests.post(
-                f"{keycloak_url}/realms/polarisai/protocol/openid-connect/token",
+                f"{keycloak_url}/realms/{os.getenv('KEYCLOAK_REALM')}/protocol/openid-connect/token",
                 data={
                     "client_id": os.getenv('KEYCLOAK_CLIENT_ID'),
                     "client_secret": os.getenv('KEYCLOAK_CLIENT_SECRET'),
