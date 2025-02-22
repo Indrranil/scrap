@@ -34,8 +34,8 @@ async def signin(credentials: SignInRequest):
             response = requests.post(
                 f"{keycloak_url}/realms/polarisai/protocol/openid-connect/token",
                 data={
-                    "client_id": "polarisai-app",
-                    "client_secret": "DbblLPrEvdp4enn8RH6NE7y6WLmoB0tV",
+                    "client_id": os.getenv('KEYCLOAK_CLIENT_ID'),
+                    "client_secret": os.getenv('KEYCLOAK_CLIENT_SECRET'),
                     "grant_type": "password",
                     "username": credentials.username,
                     "password": credentials.password
