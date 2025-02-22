@@ -75,6 +75,43 @@ async def create_pipeline_session_output(
             status_code=500,
             detail=f"Error creating pipeline session output: {str(e)}"
         )
+        
+@router.get("/all")
+async def get_all_pipeline_session_outputs(
+    overview: int = Query(1),
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
+):
+    try:
+        outputs = db.query(PipelineSessionOutputModel).filter(
+            PipelineSessionOutputModel.is_usable == 1
+        ).all()
+        
+        # If overview=1, return just the outputs list
+        if overview == 1:
+            return outputs
+            
+        # If overview=0, include related output units for each output
+        result = []
+        for output in outputs:
+            output_dict = vars(output)
+            
+            # Get related output units
+            units = db.query(PipelineSessionOutputUnit).filter(
+                PipelineSessionOutputUnit.pipeline_session_output_id == output.id,
+                PipelineSessionOutputUnit.is_usable == 1
+            ).all()
+            
+            output_dict['units'] = [vars(unit) for unit in units]
+            result.append(output_dict)
+            
+        return result
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching pipeline session outputs: {str(e)}"
+        )
 
 @router.get("/{output_id}")
 async def get_pipeline_session_output(
@@ -121,39 +158,3 @@ async def get_pipeline_session_output(
             detail=f"Error fetching pipeline session output: {str(e)}"
         )
 
-@router.get("/")
-async def get_all_pipeline_session_outputs(
-    overview: int = Query(1),
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"]))
-):
-    try:
-        outputs = db.query(PipelineSessionOutputModel).filter(
-            PipelineSessionOutputModel.is_usable == 1
-        ).all()
-        
-        # If overview=1, return just the outputs list
-        if overview == 1:
-            return outputs
-            
-        # If overview=0, include related output units for each output
-        result = []
-        for output in outputs:
-            output_dict = vars(output)
-            
-            # Get related output units
-            units = db.query(PipelineSessionOutputUnit).filter(
-                PipelineSessionOutputUnit.pipeline_session_output_id == output.id,
-                PipelineSessionOutputUnit.is_usable == 1
-            ).all()
-            
-            output_dict['units'] = [vars(unit) for unit in units]
-            result.append(output_dict)
-            
-        return result
-        
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching pipeline session outputs: {str(e)}"
-        )
