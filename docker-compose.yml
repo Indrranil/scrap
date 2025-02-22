@@ -5,7 +5,7 @@ services:
     build: .
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: app_db
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
       MYSQL_USER: ${MYSQL_USER}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     ports:
@@ -29,6 +29,10 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
+      KEYCLOAK_SCRIPT_UPLOAD: "true" 
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ./keycloak/import:/opt/keycloak/data/import
     ports:
       - "8080:8080"
     depends_on:
@@ -36,6 +40,11 @@ services:
         condition: service_healthy
     command: 
       - start-dev
+      - --import-realm
+      - --verbose
 
 volumes:
   mysql_data:
+    name: polarisai_mysql_data
+  keycloak_data:
+    name: polarisai_keycloak_data 

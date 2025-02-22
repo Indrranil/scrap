@@ -8,6 +8,7 @@ from routers.pipeline_session import router as pipeline_session_router
 from routers.signin import router as signin_router
 from routers.pipeline_session_output import router as pipeline_session_output_router
 from routers.pipeline_session_output_unit import router as pipeline_session_output_unit_router
+from routers.application import router as application_router
 # ... other router imports ...
 
 app = FastAPI(title="Machine Management API")
@@ -25,6 +26,7 @@ app.add_middleware(
 app.add_middleware(AuthMiddleware)
 
 # Include routers
+app.include_router(application_router)
 app.include_router(pipeline_session_router)
 app.include_router(signin_router)
 app.include_router(pipeline_session_output_router)

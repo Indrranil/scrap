@@ -1,8 +1,12 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.ext.declarative import declarative_base
+from os import getenv
+from dotenv import load_dotenv
 
-DATABASE_URL = "mysql+pymysql://root:rootpass@localhost:3308/app_db"
+load_dotenv()
+
+DATABASE_URL = f"mysql+pymysql://{getenv('MYSQL_USER')}:{getenv('MYSQL_PASSWORD')}@localhost:3308/{getenv('MYSQL_DATABASE')}"
 KEYCLOAK_DATABASE_URL = "mysql+pymysql://root:rootpass@localhost:3308/keycloak_db"
 
 engine = create_engine(DATABASE_URL)
