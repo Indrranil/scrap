@@ -1,18 +1,22 @@
 from fastapi import Request, HTTPException, Depends
 from fastapi.security import HTTPBearer
-from keycloak import KeycloakOpenID
+from keycloak.keycloak_openid import KeycloakOpenID
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from functools import wraps
 import jwt
+from os import getenv
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class KeycloakAuth:
     def __init__(self):
         self.keycloak = KeycloakOpenID(
-            server_url="http://localhost:8080/",
-            client_id="fastapi-client",
-            realm_name="app-realm",
-            client_secret_key="IRK0F8WoiZgBvOQtKHdXLG9Q9AjB602g"
+            server_url=str(getenv("KEYCLOAK_URL")),
+            client_id=str(getenv("KEYCLOAK_CLIENT_ID")),
+            realm_name=str(getenv("KEYCLOAK_REALM")),
+            client_secret_key=str(getenv("KEYCLOAK_CLIENT_SECRET"))
         )
         self._public_key = None
 

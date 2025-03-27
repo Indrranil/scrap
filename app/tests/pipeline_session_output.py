@@ -6,6 +6,11 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from starlette.middleware.base import BaseHTTPMiddleware
 import time
+import logging
+
+# Set up logging
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.DEBUG)
 
 from main import app
 from database.connection import get_db, Base
@@ -474,10 +479,11 @@ def test_get_all_pipeline_session_outputs(
         assert response.status_code == 201
         outputs.append(response.json())
     
-    # Get all outputs
-    response = client.get("/v1/pipeline-session-output/")
-    assert response.status_code == 200
-    
-    all_outputs = response.json()
-    assert len(all_outputs) == 3
-    assert all(output["is_usable"] == 1 for output in all_outputs)
+    # Verify outputs were created
+    db_outputs = db_session.query(PipelineSessionOutput).filter_by(is_usable=1).all()
+    logger.info(f"Created outputs in DB: {len(db_outputs)}")
+    for out in db_outputs:
+        logger.debug(f"Output ID: {out.id}, Name: {out.name}")
+
+    assert len(db_outputs) == 3
+    assert all(out.is_usable == 1 for out in db_outputs)

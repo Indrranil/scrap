@@ -20,8 +20,8 @@ async def create_pipeline_session(
     _: bool = Depends(require_roles(["app_admin"]))
 ):
     try:
+        print(request)
         user_id = request.state.user["id"]
-        
         db.begin()
         timestamp = int(time.time())
         
@@ -44,6 +44,32 @@ async def create_pipeline_session(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/all")
+async def get_all_pipeline_sessions(
+    request: Request,
+    overview: int = Query(1, required=False),
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"]))
+):
+    try:
+        print("Fetching pipeline sessions...")
+        sessions = db.query(PipelineSessionModel).filter(
+            PipelineSessionModel.is_usable == 1
+        ).all()
+        
+        print(f"Found {len(sessions)} sessions")
+        
+        return {
+            "total": len(sessions),
+            "data": sessions
+        }
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching pipeline sessions: {str(e)}"
+        )
 
 @router.get("/{session_id}")
 async def get_pipeline_session(
@@ -109,26 +135,4 @@ async def get_pipeline_session(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching pipeline session: {str(e)}"
-        )
-
-@router.get("/")
-async def get_all_pipeline_sessions(
-    request: Request,
-    overview: int = Query(1),
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"]))
-):
-    try:
-        sessions = db.query(PipelineSessionModel).filter(
-            PipelineSessionModel.is_usable == 1
-        ).all()
-        
-        return {
-            "total": len(sessions),
-            "data": sessions
-        }
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching pipeline sessions: {str(e)}"
         )

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import logging
 from dotenv import load_dotenv
 import os
@@ -12,22 +12,47 @@ router = APIRouter(prefix="/v1/auth", tags=["authentication"])
 class SignInRequest(BaseModel):
     username: str
     password: str
+    
+    @field_validator('username', 'password')
+    def validate_credentials(cls, v):
+        if not v or not v.strip():
+            raise ValueError("This field cannot be empty")
+        return v
 
 @router.post("/signin")
 async def signin(credentials: SignInRequest):
     try:
-        # Direct token request to Keycloak
-        response = requests.post(
-            f"{os.getenv('KEYCLOAK_URL')}realms/app-realm/protocol/openid-connect/token",
-            data={
-                "client_id": os.getenv("KEYCLOAK_CLIENT_ID"),
-                "client_secret": os.getenv("KEYCLOAK_CLIENT_SECRET"),
-                "grant_type": "password",
-                "username": credentials.username,
-                "password": credentials.password
-            }
-        )
+        keycloak_url = os.getenv('KEYCLOAK_URL')
+        if not keycloak_url:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication failed: Keycloak URL not configured"
+            )
+
+        # Make request to Keycloak
+        try:
+            response = requests.post(
+                f"{keycloak_url}/realms/{os.getenv('KEYCLOAK_REALM')}/protocol/openid-connect/token",
+                data={
+                    "client_id": os.getenv('KEYCLOAK_CLIENT_ID'),
+                    "client_secret": os.getenv('KEYCLOAK_CLIENT_SECRET'),
+                    "grant_type": "password",
+                    "username": credentials.username,
+                    "password": credentials.password
+                }
+            )
+        except Exception as e:
+            raise HTTPException(
+                status_code=401,
+                detail=f"Authentication failed: {str(e)}"
+            )
         
+        if response.status_code == 500:
+            raise HTTPException(
+                status_code=401,
+                detail="Authentication failed: Keycloak server error"
+            )
+            
         if response.status_code != 200:
             raise HTTPException(
                 status_code=401,
@@ -42,6 +67,12 @@ async def signin(credentials: SignInRequest):
             "refresh_token": token_data["refresh_token"]
         }
         
+    except ValueError as ve:
+        # Validation errors from pydantic
+        raise HTTPException(
+            status_code=422,
+            detail=str(ve)
+        )
     except HTTPException as he:
         raise he
     except Exception as e:

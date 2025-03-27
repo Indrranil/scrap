@@ -4,6 +4,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
+import logging
 
 from main import app
 from database.connection import get_db, Base
@@ -13,6 +14,9 @@ from models.pipeline_session_output import PipelineSessionOutput
 from models.pipeline_session_output_unit import PipelineSessionOutputUnit
 from models.general_property import GeneralProperty
 
+# Set up logging
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 SQLALCHEMY_TEST_DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(SQLALCHEMY_TEST_DATABASE_URL)
@@ -177,9 +181,7 @@ def test_get_pipeline_session_not_found(test_db):
     assert response.status_code == 404
 
 def test_get_all_pipeline_sessions(test_db, db_session, setup_application):
-    """
-    Test retrieving all pipeline sessions
-    """
+    """Test retrieving all pipeline sessions"""
     # Create multiple test sessions
     sessions = []
     for i in range(3):
@@ -195,8 +197,12 @@ def test_get_all_pipeline_sessions(test_db, db_session, setup_application):
     
     db_session.bulk_save_objects(sessions)
     db_session.commit()
-    
-    response = client.get("/v1/pipeline-session/")
+
+    logger.info("Testing get all sessions")
+    logger.debug("Attempting to fetch from /v1/pipeline-session/all")
+    response = client.get("/v1/pipeline-session/all")
+    logger.debug(f"Response status: {response.status_code}")
+    logger.debug(f"Response body: {response.text}")
     
     assert response.status_code == 200
     fetched_sessions = response.json()
@@ -269,3 +275,105 @@ def test_get_pipeline_session_with_outputs(test_db, db_session, setup_applicatio
     assert fetched_session["outputs"][0]["name"] == "Test Output"
     assert fetched_session["outputs"][0]["units"][0]["output_key"] == "test_key"
     assert fetched_session["outputs"][0]["units"][0]["output_value"] == "test_value"
+
+def test_create_pipeline_session_missing_fields(test_db):
+    """Test pipeline session creation with missing required fields"""
+    test_data = {
+        "pipeline_id": None,
+        "name": "Test Session"
+    }
+    response = client.post("/v1/pipeline-session/new", json=test_data)
+    assert response.status_code == 422
+
+def test_get_pipeline_session_soft_deleted(test_db, db_session, setup_application):
+    """Test retrieving a soft-deleted pipeline session"""
+    # Create a session and soft delete it
+    test_session = PipelineSession(
+        pipeline_id=setup_application.id,
+        pipeline_input_id=1,
+        name="Test Session",
+        created_by=mock_admin_user["id"],
+        created_at=int(time.time()),
+        is_usable=0  # Soft deleted
+    )
+    db_session.add(test_session)
+    db_session.commit()
+    db_session.refresh(test_session)
+    
+    response = client.get(f"/v1/pipeline-session/{test_session.id}")
+    assert response.status_code == 404
+
+def test_get_pipeline_session_with_invalid_overview(test_db, db_session, setup_application):
+    """Test getting pipeline session with invalid overview parameter"""
+    test_session = PipelineSession(
+        pipeline_id=setup_application.id,
+        pipeline_input_id=1,
+        name="Test Session",
+        created_by=mock_admin_user["id"],
+        created_at=int(time.time()),
+        is_usable=1
+    )
+    db_session.add(test_session)
+    db_session.commit()
+    
+    response = client.get(f"/v1/pipeline-session/{test_session.id}?overview=invalid")
+    assert response.status_code == 422
+
+def test_get_pipeline_session_outputs_empty(test_db, db_session, setup_application):
+    """Test getting pipeline session with no outputs"""
+    test_session = PipelineSession(
+        pipeline_id=setup_application.id,
+        pipeline_input_id=1,
+        name="Test Session",
+        created_by=mock_admin_user["id"],
+        created_at=int(time.time()),
+        is_usable=1
+    )
+    db_session.add(test_session)
+    db_session.commit()
+    
+    response = client.get(f"/v1/pipeline-session/{test_session.id}?overview=0")
+    assert response.status_code == 200
+    data = response.json()
+    assert "outputs" in data
+    assert len(data["outputs"]) == 0
+
+def test_get_pipeline_session_with_deleted_outputs(test_db, db_session, setup_application):
+    """Test getting pipeline session with soft-deleted outputs"""
+    # Create session with a soft-deleted output
+    test_session = PipelineSession(
+        pipeline_id=setup_application.id,
+        pipeline_input_id=1,
+        name="Test Session",
+        created_by=mock_admin_user["id"],
+        created_at=int(time.time()),
+        is_usable=1
+    )
+    db_session.add(test_session)
+    db_session.commit()
+    
+    test_output = PipelineSessionOutput(
+        pipeline_session_id=test_session.id,
+        name="Deleted Output",
+        created_at=int(time.time()),
+        is_usable=0  # Soft deleted
+    )
+    db_session.add(test_output)
+    db_session.commit()
+    
+    response = client.get(f"/v1/pipeline-session/{test_session.id}?overview=0")
+    assert response.status_code == 200
+    data = response.json()
+    assert len(data["outputs"]) == 0
+
+def test_unauthorized_access(test_db):
+    """Test accessing endpoints without proper authorization"""
+    # Temporarily remove admin role
+    original_roles = mock_admin_user["roles"]
+    mock_admin_user["roles"] = []
+    
+    response = client.get("/v1/pipeline-session/all")
+    assert response.status_code == 403
+    
+    # Restore admin role
+    mock_admin_user["roles"] = original_roles
