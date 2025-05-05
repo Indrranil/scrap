@@ -9,15 +9,17 @@ load_dotenv()
 
 router = APIRouter(prefix="/v1/auth", tags=["authentication"])
 
+
 class SignInRequest(BaseModel):
     username: str
     password: str
-    
+
     @field_validator('username', 'password')
     def validate_credentials(cls, v):
         if not v or not v.strip():
             raise ValueError("This field cannot be empty")
         return v
+
 
 @router.post("/signin")
 async def signin(credentials: SignInRequest):
@@ -46,19 +48,19 @@ async def signin(credentials: SignInRequest):
                 status_code=401,
                 detail=f"Authentication failed: {str(e)}"
             )
-        
+
         if response.status_code == 500:
             raise HTTPException(
                 status_code=401,
                 detail="Authentication failed: Keycloak server error"
             )
-            
+
         if response.status_code != 200:
             raise HTTPException(
                 status_code=401,
                 detail="Invalid credentials"
             )
-            
+
         token_data = response.json()
         return {
             "access_token": token_data["access_token"],
@@ -66,7 +68,7 @@ async def signin(credentials: SignInRequest):
             "expires_in": token_data["expires_in"],
             "refresh_token": token_data["refresh_token"]
         }
-        
+
     except ValueError as ve:
         # Validation errors from pydantic
         raise HTTPException(

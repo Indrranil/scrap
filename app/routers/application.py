@@ -1,26 +1,28 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-from sqlalchemy.orm import Session
-from typing import List
-import time
-from utils.application import check_duplicate_name
-from database.connection import get_db
-from schemas.application import ApplicationCreate, Application
-from models.application import Application as ApplicationModel
-from pydantic import ValidationError
 import logging
+import time
+from typing import List
+
+from fastapi import APIRouter, HTTPException, Depends
+from sqlalchemy.orm import Session
+
+from app.database.connection import get_db
+from app.models.application import Application as ApplicationModel
+from app.schemas.application import ApplicationCreate, Application
+from app.utils.application import check_duplicate_name
 
 router = APIRouter(prefix="/v1/application", tags=["application"])
 
 logger = logging.getLogger(__name__)
 
-@router.post("/", response_model=Application, status_code=201)
+
+@router.post("/new", response_model=Application, status_code=201)
 async def create_application(
-    application: ApplicationCreate,
-    db: Session = Depends(get_db)
+        application: ApplicationCreate,
+        db: Session = Depends(get_db)
 ):
     try:
         logger.debug(f"Creating application with data: {application.dict()}")
-        
+
         # Check for duplicate name
         if check_duplicate_name(db, application.name):
             logger.debug("Duplicate name found")
@@ -42,9 +44,9 @@ async def create_application(
         logger.debug("Database commit successful")
         db.refresh(new_application)
         logger.debug(f"Refreshed model instance: {vars(new_application)}")
-        
+
         return new_application
-            
+
     except HTTPException as he:
         # Handle HTTP exceptions separately
         db.rollback()
@@ -57,15 +59,16 @@ async def create_application(
             detail=f"Error creating application: {str(e)}"
         )
 
+
 @router.get("/all", response_model=List[Application])
 async def get_all_applications(db: Session = Depends(get_db)):
     try:
         applications = db.query(ApplicationModel).filter(
             ApplicationModel.is_usable == 1
         ).all()
-        
+
         return applications
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -75,23 +78,23 @@ async def get_all_applications(db: Session = Depends(get_db)):
 
 @router.get("/{application_id}", response_model=Application)
 async def get_application(
-    application_id: int,
-    db: Session = Depends(get_db)
+        application_id: int,
+        db: Session = Depends(get_db)
 ):
     try:
         application = db.query(ApplicationModel).filter(
             ApplicationModel.id == application_id,
             ApplicationModel.is_usable == 1
         ).first()
-        
+
         if not application:
             raise HTTPException(
                 status_code=404,
                 detail=f"Application with ID {application_id} not found"
             )
-            
+
         return application
-        
+
     except HTTPException as he:
         raise he
     except Exception as e:
@@ -103,38 +106,38 @@ async def get_application(
 
 @router.patch("/{application_id}", response_model=Application)
 async def update_application(
-    application_id: int,
-    application: ApplicationCreate,
-    db: Session = Depends(get_db)
+        application_id: int,
+        application: ApplicationCreate,
+        db: Session = Depends(get_db)
 ):
     try:
         existing_application = db.query(ApplicationModel).filter(
             ApplicationModel.id == application_id,
             ApplicationModel.is_usable == 1
         ).first()
-        
+
         if not existing_application:
             raise HTTPException(
                 status_code=404,
                 detail=f"Application with ID {application_id} not found"
             )
-        
+
         # Check for duplicate name
         if check_duplicate_name(db, application.name, exclude_id=application_id):
             raise HTTPException(
                 status_code=400,
                 detail="Application with this name already exists"
             )
-            
+
         # Update fields using setattr
         setattr(existing_application, 'name', application.name)
         setattr(existing_application, 'is_usable', application.is_usable)
-        
+
         db.commit()
         db.refresh(existing_application)
-        
+
         return existing_application
-        
+
     except HTTPException as he:
         db.rollback()
         raise he
@@ -145,34 +148,35 @@ async def update_application(
             detail=f"Error updating application: {str(e)}"
         )
 
+
 @router.delete("/{application_id}")
 async def delete_application(
-    application_id: int,
-    db: Session = Depends(get_db)
+        application_id: int,
+        db: Session = Depends(get_db)
 ):
     try:
         db.begin()
-        
+
         application = db.query(ApplicationModel).filter(
             ApplicationModel.id == application_id,
             ApplicationModel.is_usable == 1
         ).first()
-        
+
         if not application:
             raise HTTPException(
                 status_code=404,
                 detail=f"Application with ID {application_id} not found"
             )
-            
+
         # Soft delete
         application.is_usable = 0
-        
+
         db.commit()
-        
+
         return {
             "message": f"Application with ID {application_id} successfully deleted"
         }
-        
+
     except HTTPException as he:
         db.rollback()
         raise he

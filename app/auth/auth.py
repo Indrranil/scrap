@@ -1,14 +1,14 @@
-from fastapi import Request, HTTPException, Depends
-from fastapi.security import HTTPBearer
+from os import getenv
+
+import jwt
+from dotenv import load_dotenv
+from fastapi import Request, HTTPException
 from keycloak.keycloak_openid import KeycloakOpenID
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
-from functools import wraps
-import jwt
-from os import getenv
-from dotenv import load_dotenv
 
 load_dotenv()
+
 
 class KeycloakAuth:
     def __init__(self):
@@ -36,11 +36,12 @@ class KeycloakAuth:
         except Exception as e:
             raise HTTPException(status_code=401, detail=str(e))
 
+
 class AuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
         super().__init__(app)
         self.auth = KeycloakAuth()
-        self.public_paths = {"/docs", "/openapi.json", "/redoc","/v1/auth/signin"}
+        self.public_paths = {"/docs", "/openapi.json", "/redoc", "/v1/auth/signin"}
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in self.public_paths:
@@ -60,13 +61,12 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 "id": token_data.get("sub"),
                 "roles": token_data.get("realm_access", {}).get("roles", [])
             }
-            
+
             return await call_next(request)
 
         except HTTPException as e:
             return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
-        except Exception as e:
-            return JSONResponse(status_code=401, content={"detail": str(e)})
+
 
 def require_roles(allowed_roles: list[str]):
     def dependency(request: Request):
@@ -77,4 +77,5 @@ def require_roles(allowed_roles: list[str]):
                 detail="Not enough permissions"
             )
         return True
+
     return dependency

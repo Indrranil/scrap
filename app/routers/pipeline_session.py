@@ -1,30 +1,29 @@
-from fastapi import APIRouter, HTTPException, Depends, Query, Request
-from sqlalchemy.orm import Session
-from typing import List, Dict, Any
 import time
 
-from database.connection import get_db
-from schemas.pipeline_session import PipelineSessionCreate, PipelineSession
-from models.pipeline_session import PipelineSession as PipelineSessionModel
-from models.pipeline_session_output import PipelineSessionOutput
-from models.pipeline_session_output_unit import PipelineSessionOutputUnit
-from auth.auth import require_roles
+from app.auth.auth import require_roles
+from app.database.connection import get_db
+from fastapi import APIRouter, HTTPException, Depends, Query, Request
+from app.models.pipeline_session import PipelineSession as PipelineSessionModel
+from app.models.pipeline_session_output import PipelineSessionOutput
+from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
+from app.schemas.pipeline_session import PipelineSessionCreate, PipelineSession
+from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/v1/pipeline-session", tags=["pipeline-session"])
 
+
 @router.post("/new", response_model=PipelineSession, status_code=201)
 async def create_pipeline_session(
-    request: Request,
-    pipeline_session: PipelineSessionCreate,
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin"]))
+        request: Request,
+        pipeline_session: PipelineSessionCreate,
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin"]))
 ):
     try:
-        print(request)
         user_id = request.state.user["id"]
         db.begin()
         timestamp = int(time.time())
-        
+
         new_session = PipelineSessionModel(
             pipeline_id=pipeline_session.pipeline_id,
             pipeline_input_id=pipeline_session.pipeline_input_id,
@@ -34,32 +33,33 @@ async def create_pipeline_session(
             ended_at=pipeline_session.ended_at,
             is_usable=1
         )
-        
+
         db.add(new_session)
         db.commit()
         db.refresh(new_session)
-        
+
         return new_session
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.get("/all")
 async def get_all_pipeline_sessions(
-    request: Request,
-    overview: int = Query(1, required=False),
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"]))
+        request: Request,
+        overview: int = Query(1, required=False),
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         print("Fetching pipeline sessions...")
         sessions = db.query(PipelineSessionModel).filter(
             PipelineSessionModel.is_usable == 1
         ).all()
-        
+
         print(f"Found {len(sessions)} sessions")
-        
+
         return {
             "total": len(sessions),
             "data": sessions
@@ -71,13 +71,14 @@ async def get_all_pipeline_sessions(
             detail=f"Error fetching pipeline sessions: {str(e)}"
         )
 
+
 @router.get("/{session_id}")
 async def get_pipeline_session(
-    request: Request,
-    session_id: int,
-    overview: int = Query(1),
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"]))
+        request: Request,
+        session_id: int,
+        overview: int = Query(1),
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
     try:
         # Get base session data
@@ -85,20 +86,20 @@ async def get_pipeline_session(
             PipelineSessionModel.id == session_id,
             PipelineSessionModel.is_usable == 1
         ).first()
-        
+
         if not session:
             raise HTTPException(
                 status_code=404,
                 detail=f"Pipeline session with ID {session_id} not found"
             )
-        
+
         # If overview=1, return just the session data
         if overview == 1:
             return session
-            
+
         # If overview=0, include related outputs and units
         session_dict = vars(session)
-        
+
         # Get related outputs with eager loading
         outputs = (
             db.query(PipelineSessionOutput)
@@ -108,7 +109,7 @@ async def get_pipeline_session(
             )
             .all()
         )
-        
+
         outputs_list = []
         for output in outputs:
             output_dict = vars(output)
@@ -121,14 +122,14 @@ async def get_pipeline_session(
                 )
                 .all()
             )
-            
+
             output_dict['units'] = [vars(unit) for unit in units]
             outputs_list.append(output_dict)
-            
+
         session_dict['outputs'] = outputs_list
-        
+
         return session_dict
-        
+
     except HTTPException as he:
         raise he
     except Exception as e:

@@ -1,22 +1,23 @@
-from fastapi import APIRouter, HTTPException, Depends,UploadFile, File
-from schemas.product_upload import ProductUploadCreate
-from sqlalchemy.orm import Session
-from database.connection import get_db
 import time
-from fastapi.responses import JSONResponse
-import pandas as pd
 from io import StringIO
 from typing import Dict, Any
-from models.pipeline_input import PipelineInput
-from models.pipeline_input_referrer import PipelineInputReferrer
-from models.general_property import GeneralProperty
+
+import pandas as pd
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from sqlalchemy.orm import Session
+
+from app.database.connection import get_db
+from app.models.general_property import GeneralProperty
+from app.models.pipeline_input import PipelineInput
+from app.schemas.product_upload import ProductUploadCreate
 
 router = APIRouter(prefix="/v1/product", tags=["product"])
 
+
 @router.post("/")
 async def create_product_upload(
-    data: ProductUploadCreate,
-    db: Session = Depends(get_db),
+        data: ProductUploadCreate,
+        db: Session = Depends(get_db),
 ):
     try:
         # Remove context manager and start transaction manually
@@ -40,26 +41,6 @@ async def create_product_upload(
         # Store all properties for response
         properties_list = []
         timestamp = int(time.time())
-
-        # 2. Create CLD Barcode Reference
-        cld_referrer = PipelineInputReferrer(
-            key="cld_barcode",
-            value=data.cld_barcode.lower(),
-            pipeline_input_id=pipeline_input.id,
-            created_at=timestamp,
-            is_usable=1
-        )
-        db.add(cld_referrer)
-        db.flush()
-
-        # Add CLD barcode to properties list
-        properties_list.append({
-            "id": cld_referrer.id,
-            "property_label": "CLD Barcode",
-            "property_key": "cld_barcode",
-            "property_value": cld_referrer.value,
-            "created_at": cld_referrer.created_at
-        })
 
         # 3. Handle basic properties
         basic_properties = {
@@ -100,7 +81,7 @@ async def create_product_upload(
                     )
                     db.add(property_entity)
                     db.flush()
-                    
+
                     properties_list.append({
                         "id": property_entity.id,
                         "property_label": property_entity.property_label,
@@ -139,7 +120,7 @@ async def create_product_upload(
                     )
                     db.add(carton_entity)
                     db.flush()
-                    
+
                     properties_list.append({
                         "id": carton_entity.id,
                         "property_label": carton_entity.property_label,
@@ -163,7 +144,7 @@ async def create_product_upload(
 
         # Commit the transaction
         db.commit()
-        
+
         return {
             "total": 1,
             "items": [{
@@ -177,8 +158,8 @@ async def create_product_upload(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
-    
-    
+
+
 def map_csv_to_schema(row: pd.Series) -> Dict[str, Any]:
     """Map CSV row to schema fields, handling missing columns"""
     schema_mapping = {
@@ -199,18 +180,19 @@ def map_csv_to_schema(row: pd.Series) -> Dict[str, Any]:
     }
     return {k: v for k, v in schema_mapping.items() if v}
 
+
 @router.post("/bulk")
 async def create_bulk_product_upload(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+        file: UploadFile = File(...),
+        db: Session = Depends(get_db),
 ):
     try:
         contents = await file.read()
         df = pd.read_csv(StringIO(contents.decode('utf-8')))
-        
+
         # Print all column names for debugging
         print("Original CSV columns:", df.columns.tolist())
-        
+
         # Create mapping for unnamed columns
         if all(col.startswith('Unnamed:') for col in df.columns):
             headers = df.iloc[0].tolist()
@@ -256,25 +238,6 @@ async def create_bulk_product_upload(
                         db.add(pipeline_input)
                         db.flush()
 
-                    # 2. Create CLD Barcode Reference
-                    cld_referrer = PipelineInputReferrer(
-                        key="cld_barcode",
-                        value=product_data.cld_barcode.lower(),
-                        pipeline_input_id=pipeline_input.id,
-                        created_at=timestamp,
-                        is_usable=1
-                    )
-                    db.add(cld_referrer)
-                    db.flush()
-
-                    properties_list.append({
-                        "id": cld_referrer.id,
-                        "property_label": "CLD Barcode",
-                        "property_key": "cld_barcode",
-                        "property_value": cld_referrer.value,
-                        "created_at": cld_referrer.created_at
-                    })
-
                     # 3. Add basic properties
                     basic_properties = {
                         "material": {
@@ -289,8 +252,10 @@ async def create_bulk_product_upload(
                             "Expiry Date": product_data.expiry_date,
                         },
                         "specifications": {
-                            "target_weight": str(product_data.target_weight) if product_data.target_weight is not None else None,
-                            "tare_weight": str(product_data.tare_weight) if product_data.tare_weight is not None else None,
+                            "target_weight": str(
+                                product_data.target_weight) if product_data.target_weight is not None else None,
+                            "tare_weight": str(
+                                product_data.tare_weight) if product_data.tare_weight is not None else None,
                             "FORM FACTOR": product_data.form_factor
                         },
                         "identifiers": {
@@ -313,7 +278,7 @@ async def create_bulk_product_upload(
                                 )
                                 db.add(prop_entity)
                                 db.flush()
-                                
+
                                 properties_list.append({
                                     "id": prop_entity.id,
                                     "property_label": property_label,
@@ -327,7 +292,7 @@ async def create_bulk_product_upload(
                         for is_tube in [False, True]:
                             property_key = "pqs_tube" if is_tube else "pqs_carton"
                             is_usable = 0 if is_tube else 1
-                            
+
                             pqs_properties = {
                                 "front_face": "1", "back_face": "1",
                                 "left_face": "1", "right_face": "1",
@@ -348,7 +313,7 @@ async def create_bulk_product_upload(
                                 )
                                 db.add(pqs_entity)
                                 db.flush()
-                                
+
                                 if is_usable == 1:  # Only add carton properties to response
                                     properties_list.append({
                                         "id": pqs_entity.id,
@@ -391,40 +356,24 @@ async def create_bulk_product_upload(
             status_code=500,
             detail=f"Error processing file: {str(e)}"
         )
-        
-        
+
+
 @router.get("/properties")
 async def get_all_product_properties(db: Session = Depends(get_db)):
     try:
         products = db.query(PipelineInput).filter(PipelineInput.is_usable == 1).all()
-        
+
         items = []
         for product in products:
             properties = []
-            
-            # Get CLD barcode reference
-            cld_referrer = db.query(PipelineInputReferrer).filter(
-                PipelineInputReferrer.pipeline_input_id == product.id,
-                PipelineInputReferrer.key == 'cld_barcode',
-                PipelineInputReferrer.is_usable == 1
-            ).first()
-            
-            if cld_referrer:
-                properties.append({
-                    "id": cld_referrer.id,
-                    "property_label": "CLD Barcode",
-                    "property_key": "cld_barcode",
-                    "property_value": cld_referrer.value,
-                    "created_at": cld_referrer.created_at
-                })
-            
+
             # Get other properties
             product_properties = db.query(GeneralProperty).filter(
                 GeneralProperty.referrer_id == product.id,
                 GeneralProperty.property_type == 'pipeline_input',
                 GeneralProperty.is_usable == 1
             ).all()
-            
+
             for prop in product_properties:
                 properties.append({
                     "id": prop.id,
@@ -433,7 +382,7 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
                     "property_value": prop.property_value,
                     "created_at": prop.created_at
                 })
-            
+
             items.append({
                 "id": product.id,
                 "name": product.name,
@@ -451,12 +400,13 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
             status_code=500,
             detail=f"Error fetching properties: {str(e)}"
         )
-        
+
+
 @router.put("/{product_id}")
 async def update_product(
-    product_id: int,
-    data: ProductUploadCreate,
-    db: Session = Depends(get_db),
+        product_id: int,
+        data: ProductUploadCreate,
+        db: Session = Depends(get_db),
 ):
     try:
         # Start transaction
@@ -479,34 +429,34 @@ async def update_product(
         timestamp = int(time.time())
         properties_list = []
 
-        # 2. Update CLD Barcode Reference
-        cld_referrer = db.query(PipelineInputReferrer).filter(
-            PipelineInputReferrer.pipeline_input_id == product_id,
-            PipelineInputReferrer.key == "cld_barcode",
-            PipelineInputReferrer.is_usable == 1
-        ).first()
-
-        if cld_referrer:
-            cld_referrer.value = data.cld_barcode.lower()
-            cld_referrer.created_at = timestamp
-        else:
-            cld_referrer = PipelineInputReferrer(
-                key="cld_barcode",
-                value=data.cld_barcode.lower(),
-                pipeline_input_id=pipeline_input.id,
-                created_at=timestamp,
-                is_usable=1
-            )
-            db.add(cld_referrer)
-        db.flush()
-
-        properties_list.append({
-            "id": cld_referrer.id,
-            "property_label": "CLD Barcode",
-            "property_key": "cld_barcode",
-            "property_value": cld_referrer.value,
-            "created_at": cld_referrer.created_at
-        })
+        # # 2. Update CLD Barcode Reference
+        # cld_referrer = db.query(PipelineInputReferrer).filter(
+        #     PipelineInputReferrer.pipeline_input_id == product_id,
+        #     PipelineInputReferrer.key == "cld_barcode",
+        #     PipelineInputReferrer.is_usable == 1
+        # ).first()
+        #
+        # if cld_referrer:
+        #     cld_referrer.value = data.cld_barcode.lower()
+        #     cld_referrer.created_at = timestamp
+        # else:
+        #     cld_referrer = PipelineInputReferrer(
+        #         key="cld_barcode",
+        #         value=data.cld_barcode.lower(),
+        #         pipeline_input_id=pipeline_input.id,
+        #         created_at=timestamp,
+        #         is_usable=1
+        #     )
+        #     db.add(cld_referrer)
+        # db.flush()
+        #
+        # properties_list.append({
+        #     "id": cld_referrer.id,
+        #     "property_label": "CLD Barcode",
+        #     "property_key": "cld_barcode",
+        #     "property_value": cld_referrer.value,
+        #     "created_at": cld_referrer.created_at
+        # })
 
         # 3. Update basic properties
         basic_properties = {
@@ -554,7 +504,7 @@ async def update_product(
                     )
                     db.add(property_entity)
                     db.flush()
-                    
+
                     properties_list.append({
                         "id": property_entity.id,
                         "property_label": property_entity.property_label,
@@ -606,7 +556,7 @@ async def update_product(
 
         # Commit the transaction
         db.commit()
-        
+
         return {
             "id": pipeline_input.id,
             "name": pipeline_input.name,
@@ -618,10 +568,11 @@ async def update_product(
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
+
 @router.delete("/{product_id}")
 async def delete_product(
-    product_id: int,
-    db: Session = Depends(get_db),
+        product_id: int,
+        db: Session = Depends(get_db),
 ):
     try:
         # Start transaction
@@ -638,12 +589,6 @@ async def delete_product(
 
         # 2. Soft delete pipeline input
         pipeline_input.is_usable = 0
-
-        # 3. Soft delete all associated properties
-        db.query(PipelineInputReferrer).filter(
-            PipelineInputReferrer.pipeline_input_id == product_id,
-            PipelineInputReferrer.is_usable == 1
-        ).update({"is_usable": 0})
 
         db.query(GeneralProperty).filter(
             GeneralProperty.referrer_id == product_id,

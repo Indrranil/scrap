@@ -10,7 +10,7 @@ import os
 # Add the app directory to Python path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from database.connection import Base, get_db
+from app.database.connection import Base, get_db
 from main import app
 from models.general_property import GeneralProperty
 from models.pipeline_input_referrer import PipelineInputReferrer

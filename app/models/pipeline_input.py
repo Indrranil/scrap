@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, BigInteger
-from database.connection import Base
+from app.database.connection import Base
 
 class PipelineInput(Base):
     __tablename__ = "pipeline_input"

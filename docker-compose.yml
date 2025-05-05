@@ -23,8 +23,8 @@ services:
     environment:
       KC_DB: "mysql"
       KC_DB_URL: "jdbc:mysql://mysql:3306/keycloak_db"
-      KC_DB_USERNAME: ${MYSQL_USER}
-      KC_DB_PASSWORD: ${MYSQL_PASSWORD}
+      KC_DB_USERNAME: root
+      KC_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HOSTNAME_STRICT: "false"

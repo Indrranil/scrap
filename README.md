@@ -9,34 +9,35 @@ Backend services for PolarisAI using FastAPI, MySQL, and Keycloak.
 ## Setup
 
 1. Clone the repository
-```bash
-git clone -b girish https://github.com/prowiz-analytics/polarisai-app-api
-```
+    ```bash
+    git clone -b girish https://github.com/prowiz-analytics/polarisai-app-api
+    ```
 
 2. Create `.env` file
-```env
-MYSQL_ROOT_PASSWORD=rootpass
-MYSQL_DATABASE=app_db
-MYSQL_USER=app_user
-MYSQL_PASSWORD=root
-KEYCLOAK_ADMIN=admin
-KEYCLOAK_ADMIN_PASSWORD=admin_password
-```
+    ```env
+    MYSQL_ROOT_PASSWORD=rootpass
+    MYSQL_DATABASE=app_db
+    MYSQL_USER=app_user
+    MYSQL_PASSWORD=root
+    KEYCLOAK_ADMIN=admin
+    KEYCLOAK_ADMIN_PASSWORD=admin_password
+    ```
 
 3. Build and Start Services
-```bash
-# Clean build containers
-docker-compose build --no-cache
+    ```bash
+    # Clean build containers
+    docker-compose build --no-cache
+    
+    # Start services in background
+    docker-compose up -d
+    ```
 
-# Start services in background
-docker-compose up -d
-```
 4. Database Access
-```bash
-# Connect to MySQL
-docker exec -it mysql-docker-mysql-1 mysql -u app_user -p
-# Password: root
-```
+    ```bash
+    # Connect to MySQL
+    docker exec -it mysql-docker-mysql-1 mysql -u app_user -p
+    # Password: root
+    ```
 
 ## Access Points
 

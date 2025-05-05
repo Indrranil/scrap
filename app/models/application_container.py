@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, BigInteger
-from database.connection import Base
+from app.database.connection import Base
 
 class ApplicationContainer(Base):
     __tablename__ = "application_container"

@@ -12,7 +12,7 @@ from pydantic import ValidationError, BaseModel, validator
 from typing import Optional
 
 from main import app
-from database.connection import get_db, Base
+from app.database.connection import get_db, Base
 from schemas.application import ApplicationCreate
 from models.application import Application as ApplicationModel
 

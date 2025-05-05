@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, BigInteger, Enum
-from database.connection import Base
+from app.database.connection import Base
 
 class ApplicationStatus(enum.Enum):
     start = "start"

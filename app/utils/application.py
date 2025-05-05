@@ -1,6 +1,7 @@
 from sqlalchemy.orm import Session
-from models.application import Application as ApplicationModel
+from app.models.application import Application as ApplicationModel
 from typing import Optional
+
 
 def check_duplicate_name(db: Session, name: str, exclude_id: Optional[int] = None) -> bool:
     """Check if an application with the given name already exists"""
@@ -10,4 +11,4 @@ def check_duplicate_name(db: Session, name: str, exclude_id: Optional[int] = Non
     )
     if exclude_id:
         query = query.filter(ApplicationModel.id != exclude_id)
-    return db.query(query.exists()).scalar() 
+    return db.query(query.exists()).scalar()

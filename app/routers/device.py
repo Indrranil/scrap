@@ -1,35 +1,37 @@
+import time
+from io import StringIO
+
+import pandas as pd
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from sqlalchemy.orm import Session
-from fastapi.responses import JSONResponse
-import pandas as pd
-from io import StringIO
-import time
-from typing import Dict,List
-from database.connection import get_db
-from schemas.device import DeviceUploadCreate, DeviceResponse, DEVICE_TYPE_MAPPING
-from models.machine import Machine
-from models.general_property import GeneralProperty
+
+from app.database.connection import get_db
+from app.models.general_property import GeneralProperty
+from app.models.machine import Machine
+from app.schemas.device import DeviceUploadCreate, DEVICE_TYPE_MAPPING
 
 router = APIRouter(prefix="/v1/device", tags=["device"])
+
 
 def generate_mid(name: str) -> str:
     """Generate standardized MID based on device name"""
     name_lower = name.lower().replace(" ", "")
-    
+
     if "weight" in name_lower:
         prefix = "W"
     elif "perforation" in name_lower:
         prefix = "P"
     else:
         prefix = "R"
-    
+
     suffix = str(int(time.time()))[-6:]
     return f"{prefix}_{suffix}"
 
+
 @router.post("/")
 async def create_device(
-    device: DeviceUploadCreate,
-    db: Session = Depends(get_db),
+        device: DeviceUploadCreate,
+        db: Session = Depends(get_db),
 ):
     try:
         db.begin()
@@ -68,13 +70,13 @@ async def create_device(
             db.flush()
             device_id = new_device.id
             device_response = new_device
-        
+
         # Add network properties
         network_properties = {
             "ip_address": device.ip_address,
             "mac_address": device.mac_address
         }
-        
+
         for property_label, property_value in network_properties.items():
             if property_value and str(property_value).strip():
                 network_entity = GeneralProperty(
@@ -88,7 +90,7 @@ async def create_device(
                 )
                 db.add(network_entity)
                 db.flush()
-                
+
                 properties_list.append({
                     "id": network_entity.id,
                     "property_label": property_label,
@@ -96,13 +98,13 @@ async def create_device(
                     "property_value": str(property_value).lower(),
                     "created_at": timestamp
                 })
-        
+
         # Add communication properties
         communication_properties = {
             "baud_rate": device.baud_rate,
             "starting_address": device.starting_address
         }
-        
+
         for property_label, property_value in communication_properties.items():
             if property_value and str(property_value).strip():
                 comm_entity = GeneralProperty(
@@ -116,7 +118,7 @@ async def create_device(
                 )
                 db.add(comm_entity)
                 db.flush()
-                
+
                 properties_list.append({
                     "id": comm_entity.id,
                     "property_label": property_label,
@@ -124,7 +126,7 @@ async def create_device(
                     "property_value": str(property_value).lower(),
                     "created_at": timestamp
                 })
-        
+
         # Add device type as a property
         device_type_entity = GeneralProperty(
             referrer_id=device_id,
@@ -137,7 +139,7 @@ async def create_device(
         )
         db.add(device_type_entity)
         db.flush()
-        
+
         properties_list.append({
             "id": device_type_entity.id,
             "property_label": "device_type",
@@ -147,7 +149,7 @@ async def create_device(
         })
 
         db.commit()
-        
+
         return {
             "total": 1,
             "items": [{
@@ -165,10 +167,11 @@ async def create_device(
             detail=f"Error creating device: {str(e)}"
         )
 
+
 @router.post("/bulk")
 async def create_bulk_device_upload(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+        file: UploadFile = File(...),
+        db: Session = Depends(get_db),
 ):
     try:
         contents = await file.read()
@@ -349,25 +352,24 @@ async def create_bulk_device_upload(
             status_code=500,
             detail=f"Error processing file: {str(e)}"
         )
-        
 
 
 @router.get("/")
 async def get_all_devices(db: Session = Depends(get_db)):
     try:
         devices = db.query(Machine).filter(Machine.is_usable == 1).all()
-        
+
         items = []
         for device in devices:
             properties = []
-            
+
             # Get all properties for this device
             device_properties = db.query(GeneralProperty).filter(
                 GeneralProperty.referrer_id == device.id,
                 GeneralProperty.property_type == 'machine',
                 GeneralProperty.is_usable == 1
             ).all()
-            
+
             # Convert properties to the new format
             for prop in device_properties:
                 properties.append({
@@ -377,7 +379,7 @@ async def get_all_devices(db: Session = Depends(get_db)):
                     "property_value": prop.property_value,
                     "created_at": prop.created_at
                 })
-            
+
             items.append({
                 "id": device.id,
                 "name": device.name,
@@ -395,12 +397,13 @@ async def get_all_devices(db: Session = Depends(get_db)):
             status_code=500,
             detail=f"Error fetching devices: {str(e)}"
         )
-        
+
+
 @router.put("/{device_id}")
 async def update_device(
-    device_id: int,
-    device: DeviceUploadCreate,
-    db: Session = Depends(get_db)
+        device_id: int,
+        device: DeviceUploadCreate,
+        db: Session = Depends(get_db)
 ):
     try:
         # Start transaction
@@ -443,7 +446,7 @@ async def update_device(
             "ip_address": device.ip_address,
             "mac_address": device.mac_address
         }
-        
+
         for property_label, property_value in network_properties.items():
             if property_value and str(property_value).strip():
                 network_entity = GeneralProperty(
@@ -457,7 +460,7 @@ async def update_device(
                 )
                 db.add(network_entity)
                 db.flush()
-                
+
                 properties_list.append({
                     "id": network_entity.id,
                     "property_label": property_label,
@@ -471,7 +474,7 @@ async def update_device(
             "baud_rate": device.baud_rate,
             "starting_address": device.starting_address
         }
-        
+
         for property_label, property_value in communication_properties.items():
             if property_value and str(property_value).strip():
                 comm_entity = GeneralProperty(
@@ -485,7 +488,7 @@ async def update_device(
                 )
                 db.add(comm_entity)
                 db.flush()
-                
+
                 properties_list.append({
                     "id": comm_entity.id,
                     "property_label": property_label,
@@ -493,7 +496,6 @@ async def update_device(
                     "property_value": str(property_value).lower(),
                     "created_at": timestamp
                 })
-
 
         device_type_entity = GeneralProperty(
             referrer_id=device_id,
@@ -534,10 +536,11 @@ async def update_device(
             detail=f"Error updating device: {str(e)}"
         )
 
+
 @router.delete("/{device_id}")
 async def delete_device(
-    device_id: int,
-    db: Session = Depends(get_db)
+        device_id: int,
+        db: Session = Depends(get_db)
 ):
     try:
         # Start transaction

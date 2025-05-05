@@ -7,7 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 import logging
 
 from main import app
-from database.connection import get_db, Base
+from app.database.connection import get_db, Base
 from models.pipeline_session import PipelineSession
 from models.application import Application 
 from models.pipeline_session_output import PipelineSessionOutput

@@ -1,11 +1,13 @@
 from sqlalchemy import Column, Integer, String, Enum, BigInteger
-from database.connection import Base
+from app.database.connection import Base
 import enum
+
 
 class MachineType(str, enum.Enum):
     weight_machine = "weight machine"
     perforation = "perforation"
     rejector = "rejector"
+
 
 class Machine(Base):
     __tablename__ = "machine"

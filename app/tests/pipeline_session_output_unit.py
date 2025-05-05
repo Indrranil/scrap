@@ -7,7 +7,7 @@ from fastapi import Request, HTTPException
 import time
 
 from main import app
-from database.connection import get_db, Base
+from app.database.connection import get_db, Base
 from models.pipeline_session import PipelineSession
 from models.pipeline_session_output import PipelineSessionOutput
 from models.pipeline_session_output_unit import PipelineSessionOutputUnit
