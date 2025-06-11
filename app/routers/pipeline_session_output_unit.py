@@ -32,6 +32,7 @@ async def create_pipeline_session_output_unit(
         new_unit = PipelineSessionOutputUnitModel(
             pipeline_session_output_id=unit.pipeline_session_output_id,
             property_reference_id=unit.property_reference_id,
+            verdict=unit.verdict,
             name=unit.name,
             output_key=unit.output_key,
             output_value=unit.output_value,

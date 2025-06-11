@@ -3,6 +3,7 @@ from typing import Optional, List
 
 from fastapi import APIRouter, HTTPException, Depends, Query
 from sqlalchemy.orm import Session
+from starlette import status
 
 from app.auth.auth import require_roles
 from app.database.connection import get_db
@@ -22,6 +23,8 @@ async def create_pipeline_session_output(
         db: Session = Depends(get_db),
         _: bool = Depends(require_roles(["app_admin", "app_user"]))
 ):
+    if manual and pipeline_session_output.pipeline_session_output_unit:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either manual mode or pipeline session output unit should be used")
     try:
         db.begin()
 
@@ -38,6 +41,16 @@ async def create_pipeline_session_output(
 
         db.add(new_output)
         db.flush()  # Flush to get the new output ID
+
+        if pipeline_session_output.pipeline_session_output_unit:
+            pipeline_session_output.pipeline_session_output_unit.pipeline_session_output_id = new_output.id
+            # Create pipeline session output unit
+            new_output_unit = PipelineSessionOutputUnit(
+                **pipeline_session_output.pipeline_session_output_unit.model_dump(),
+                created_at=timestamp
+            )
+
+            db.add(new_output_unit)
 
         # If manual mode, create output units
         if manual:

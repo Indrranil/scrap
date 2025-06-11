@@ -1,13 +1,18 @@
 from pydantic import BaseModel
 from typing import Optional
 
+from app.schemas.pipeline_session_output_unit import PipelineSessionOutputUnitBase
+
+
 class PipelineSessionOutputBase(BaseModel):
     pipeline_session_id: int
     name: Optional[str] = None
     ended_at: Optional[int] = None
 
+
 class PipelineSessionOutputCreate(PipelineSessionOutputBase):
-    pass
+    pipeline_session_output_unit: Optional[PipelineSessionOutputUnitBase] = None
+
 
 class PipelineSessionOutput(PipelineSessionOutputBase):
     id: int

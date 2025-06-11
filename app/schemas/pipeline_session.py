@@ -1,6 +1,9 @@
 # schemas/pipeline_session.py
-from pydantic import BaseModel
+from fastapi import HTTPException
+from pydantic import BaseModel, field_validator
 from typing import Optional
+
+from starlette import status
 
 
 class PipelineSessionBase(BaseModel):
@@ -22,3 +25,26 @@ class PipelineSession(PipelineSessionBase):
 
     class Config:
         from_attributes = True
+
+
+class Pagination(BaseModel):
+    page: Optional[int] = 1
+
+    @field_validator('page')
+    @classmethod
+    def check_page(cls, p: int):
+        if p < 1:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='invalid page')
+        return p
+
+
+class Sort(BaseModel):
+    sort: int = 0  # 0 = ascending, 1 = descending
+
+
+class Limit(BaseModel):
+    limit: int = -1  # -1 = no limit
+
+
+class BasicFilter(Sort, Limit):
+    pass

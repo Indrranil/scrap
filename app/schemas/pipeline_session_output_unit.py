@@ -13,12 +13,12 @@ class UnitStatus(str, Enum):
 
 
 class PipelineSessionOutputUnitBase(BaseModel):
-    id: int
-    pipeline_session_output_id: int
-    property_reference_id: int
+    pipeline_session_output_id: Optional[int] = None
+    property_reference_id: Optional[int] = None
     name: Optional[str] = None
     output_key: str
     output_value: Optional[str] = None
+    verdict: Optional[int] = None
     status: UnitStatus
 
 
