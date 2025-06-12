@@ -70,7 +70,7 @@ CREATE TABLE `pipeline_session` (
   `pipeline_id` int,
   `pipeline_input_id` int,
   `name` varchar(255),
-  `created_by` int,
+  `created_by` varchar(255),
   `created_at` bigint,
   `ended_at` bigint,
   `is_usable` int
@@ -93,6 +93,7 @@ CREATE TABLE `pipeline_session_output_unit` (
   `output_key` varchar(255),
   `output_value` varchar(255),
   `status` ENUM ('idle', 'ready', 'analysing', 'success', 'error'),
+  `verdict` int,
   `created_at` bigint,
   `is_usable` int
 );
