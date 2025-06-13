@@ -44,7 +44,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         self.public_paths = {"/docs", "/openapi.json", "/redoc", "/v1/auth/signin"}
 
     async def dispatch(self, request: Request, call_next):
-        if request.url.path in self.public_paths:
+        if request.url.path in self.public_paths or request.method == "OPTIONS":
             return await call_next(request)
 
         try:

@@ -9,7 +9,6 @@ python-jose[cryptography]
 passlib 
 bcrypt
 pyjwt
-keycloak
 pytest 
 pytest-asyncio 
 httpx

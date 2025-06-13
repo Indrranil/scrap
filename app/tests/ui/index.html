@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Simple Auth App</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="signIn()">Sign In</button>
+
+    <h3>Response</h3>
+    <button onclick="callProtectedEndpoint()">Call /endpoint</button>
+    <pre id="responseArea">{}</pre>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
