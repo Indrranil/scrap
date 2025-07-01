@@ -58,7 +58,7 @@ async def get_all_pipeline_sessions(
             sort = PipelineSessionModel.id.asc()
         else:
             sort = PipelineSessionModel.id.desc()
-            
+
         base_query = db.query(PipelineSessionModel).filter(PipelineSessionModel.is_usable == 1) if pipeline_id is None else db.query(PipelineSessionModel).filter(PipelineSessionModel.is_usable == 1, PipelineSessionModel.pipeline_id == pipeline_id)
 
         if filters.limit > 0:

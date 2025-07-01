@@ -139,7 +139,7 @@ async def bulk_create_users(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
 
 
-@router.get("/", response_model=UsersListResponse)
+@router.get("/all", response_model=UsersListResponse)
 async def get_all_users():
     try:
         users = keycloak_admin.get_users({})
