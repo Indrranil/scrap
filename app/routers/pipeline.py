@@ -62,14 +62,43 @@ async def create_pipeline(
         )
 
 
-@router.get("/all", response_model=List[Pipeline])
+@router.get("/all")
 async def get_all_pipelines(db: Session = Depends(get_db)):
     try:
         pipelines = db.query(PipelineModel).filter(
             PipelineModel.is_usable == 1
         ).all()
 
-        return pipelines
+        items = []
+        for pipeline in pipelines:
+            properties = []
+
+            # Get all properties for this device
+            device_properties = db.query(GeneralProperty).filter(
+                GeneralProperty.referrer_id == pipeline.id,
+                GeneralProperty.property_type == 'pipeline',
+                GeneralProperty.is_usable == 1
+            ).all()
+
+            # Convert properties to the new format
+            for prop in device_properties:
+                properties.append({
+                    "id": prop.id,
+                    "property_label": prop.property_label,
+                    "property_key": prop.property_key,
+                    "property_value": prop.property_value,
+                    "created_at": prop.created_at
+                })
+
+            items.append({
+                **vars(pipeline),
+                "properties": properties
+            })
+
+        return {
+            "total": len(items),
+            "items": items
+        }
 
     except Exception as e:
         raise HTTPException(

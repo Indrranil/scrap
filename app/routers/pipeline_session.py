@@ -48,6 +48,7 @@ async def create_pipeline_session(
 @router.get("/all")
 async def get_all_pipeline_sessions(
         overview: int = Query(1, required=False),
+        pipeline_id: int = Query(None, required=False),
         filters: BasicFilter = Depends(),
         db: Session = Depends(get_db),
         _: bool = Depends(require_roles(["app_admin", "app_user"]))
@@ -57,15 +58,13 @@ async def get_all_pipeline_sessions(
             sort = PipelineSessionModel.id.asc()
         else:
             sort = PipelineSessionModel.id.desc()
+            
+        base_query = db.query(PipelineSessionModel).filter(PipelineSessionModel.is_usable == 1) if pipeline_id is None else db.query(PipelineSessionModel).filter(PipelineSessionModel.is_usable == 1, PipelineSessionModel.pipeline_id == pipeline_id)
 
         if filters.limit > 0:
-            sessions = db.query(PipelineSessionModel).filter(
-                PipelineSessionModel.is_usable == 1
-            ).order_by(sort).limit(filters.limit).all()
+            sessions = base_query.order_by(sort).limit(filters.limit).all()
         else:
-            sessions = db.query(PipelineSessionModel).filter(
-                PipelineSessionModel.is_usable == 1
-            ).order_by(sort).all()
+            sessions = base_query.order_by(sort).all()
 
         # If overview=1, return just the session data
         if overview == 1:
