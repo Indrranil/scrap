@@ -15,6 +15,6 @@ class Machine(Base):
     id = Column(Integer, primary_key=True, index=True)
     mid = Column(String(255))
     name = Column(String(255))
-    machine_type = Column(Enum(MachineType))
+    machine_type = Column(String(255))
     created_at = Column(BigInteger)
     is_usable = Column(Integer)

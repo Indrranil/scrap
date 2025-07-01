@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
+from app.models.general_property import GeneralProperty
 from app.models.pipeline import Pipeline as PipelineModel
 from app.schemas.pipeline import PipelineCreate, Pipeline
 
@@ -20,7 +21,7 @@ async def create_pipeline(
         db: Session = Depends(get_db)
 ):
     try:
-        logger.debug(f"Creating pipeline with data: {pipeline.dict()}")
+        logger.debug(f"Creating pipeline with data: {pipeline.model_dump()}")
 
         # # Check for duplicate name
         # if check_duplicate_name(db, pipeline.name):
@@ -77,7 +78,7 @@ async def get_all_pipelines(db: Session = Depends(get_db)):
         )
 
 
-@router.get("/{pipeline_id}", response_model=Pipeline)
+@router.get("/{pipeline_id}")
 async def get_pipeline(
         pipeline_id: int,
         db: Session = Depends(get_db)
@@ -94,14 +95,33 @@ async def get_pipeline(
                 detail=f"Pipeline with ID {pipeline_id} not found"
             )
 
-        return pipeline
+        properties = []
+        # Get all properties for this pipeline
+        pipeline_properties = db.query(GeneralProperty).filter(
+            GeneralProperty.referrer_id == pipeline_id,
+            GeneralProperty.property_type == 'pipeline',
+            GeneralProperty.is_usable == 1
+        ).all()
 
-    except HTTPException as he:
-        raise he
+        # Convert properties to the new format
+        for prop in pipeline_properties:
+            properties.append({
+                "id": prop.id,
+                "property_label": prop.property_label,
+                "property_key": prop.property_key,
+                "property_value": prop.property_value,
+                "created_at": prop.created_at
+            })
+
+        return {
+            **vars(pipeline),
+            "properties": properties
+        }
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"Error fetching pipeline: {str(e)}"
+            detail=f"Error fetching the pipeline: {str(e)}"
         )
 
 

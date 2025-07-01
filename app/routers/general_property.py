@@ -1,3 +1,5 @@
+import logging
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -5,7 +7,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
+from app.schemas.general_property import GeneralPropertyBase
 
+
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/general-property", tags=["General Property"])
 
 
@@ -65,4 +70,35 @@ async def get_all_properties(
         raise HTTPException(
             status_code=500,
             detail=f"Error fetching properties: {str(e)}"
+        )
+
+
+@router.post("/new", status_code=201)
+async def create_general_property(
+        general_property_payload: GeneralPropertyBase,
+        db: Session = Depends(get_db)
+):
+    try:
+        # Create new general property
+        new_general_property = GeneralProperty(
+            **general_property_payload.model_dump(),
+            created_at=int(time.time())
+        )
+
+        db.add(new_general_property)
+        db.commit()
+        db.refresh(new_general_property)
+
+        return new_general_property
+
+    except HTTPException as he:
+        # Handle HTTP exceptions separately
+        db.rollback()
+        raise he
+    except Exception as e:
+        logger.error(f"Error in create_pipeline: {str(e)}")
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error creating pipeline: {str(e)}"
         )

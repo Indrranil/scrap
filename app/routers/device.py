@@ -2,13 +2,14 @@ import time
 from io import StringIO
 
 import pandas as pd
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Query
 from sqlalchemy.orm import Session
+from starlette import status
 
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
 from app.models.machine import Machine
-from app.schemas.device import DeviceUploadCreate, DEVICE_TYPE_MAPPING
+from app.schemas.device import DeviceUploadCreate
 
 router = APIRouter(prefix="/v1/device", tags=["device"])
 
@@ -36,117 +37,31 @@ async def create_device(
     try:
         db.begin()
 
-        mapped_type = DEVICE_TYPE_MAPPING.get(device.machine_type.lower())
-        if not mapped_type:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid device type: {device.machine_type}. Must be one of: {', '.join(DEVICE_TYPE_MAPPING.keys())}"
-            )
-
         # Store all properties for response
         properties_list = []
         timestamp = int(time.time())
 
         # Check if device exists
         existing_device = db.query(Machine).filter(
-            Machine.name == device.name.lower(),
+            Machine.name == device.name,
             Machine.is_usable == 1
         ).first()
 
         if existing_device:
-            device_id = existing_device.id
             device_response = existing_device
         else:
             # Generate standardized MID and create new device
             generated_mid = generate_mid(device.name)
             new_device = Machine(
-                name=device.name.lower(),
+                name=device.name,
                 mid=generated_mid,
-                machine_type=mapped_type,
+                machine_type=device.machine_type,
                 created_at=timestamp,
                 is_usable=1
             )
             db.add(new_device)
             db.flush()
-            device_id = new_device.id
             device_response = new_device
-
-        # Add network properties
-        network_properties = {
-            "ip_address": device.ip_address,
-            "mac_address": device.mac_address
-        }
-
-        for property_label, property_value in network_properties.items():
-            if property_value and str(property_value).strip():
-                network_entity = GeneralProperty(
-                    referrer_id=device_id,
-                    property_type="machine",
-                    property_key="network",
-                    property_label=property_label,
-                    property_value=str(property_value).lower(),
-                    created_at=timestamp,
-                    is_usable=1
-                )
-                db.add(network_entity)
-                db.flush()
-
-                properties_list.append({
-                    "id": network_entity.id,
-                    "property_label": property_label,
-                    "property_key": "network",
-                    "property_value": str(property_value).lower(),
-                    "created_at": timestamp
-                })
-
-        # Add communication properties
-        communication_properties = {
-            "baud_rate": device.baud_rate,
-            "starting_address": device.starting_address
-        }
-
-        for property_label, property_value in communication_properties.items():
-            if property_value and str(property_value).strip():
-                comm_entity = GeneralProperty(
-                    referrer_id=device_id,
-                    property_type="machine",
-                    property_key="communication",
-                    property_label=property_label,
-                    property_value=str(property_value).lower(),
-                    created_at=timestamp,
-                    is_usable=1
-                )
-                db.add(comm_entity)
-                db.flush()
-
-                properties_list.append({
-                    "id": comm_entity.id,
-                    "property_label": property_label,
-                    "property_key": "communication",
-                    "property_value": str(property_value).lower(),
-                    "created_at": timestamp
-                })
-
-        # Add device type as a property
-        device_type_entity = GeneralProperty(
-            referrer_id=device_id,
-            property_type="machine",
-            property_key="specifications",
-            property_label="device_type",
-            property_value=mapped_type,
-            created_at=timestamp,
-            is_usable=1
-        )
-        db.add(device_type_entity)
-        db.flush()
-
-        properties_list.append({
-            "id": device_type_entity.id,
-            "property_label": "device_type",
-            "property_key": "specifications",
-            "property_value": mapped_type,
-            "created_at": timestamp
-        })
 
         db.commit()
 
@@ -215,10 +130,6 @@ async def create_bulk_device_upload(
                         starting_address=str(row["starting_address"]).strip()
                     )
 
-                    mapped_type = DEVICE_TYPE_MAPPING.get(device_data.machine_type.lower())
-                    if not mapped_type:
-                        raise ValueError(f"Invalid device type: {device_data.machine_type}")
-
                     properties_list = []
                     timestamp = int(time.time())
 
@@ -235,7 +146,7 @@ async def create_bulk_device_upload(
                         device = Machine(
                             name=device_data.name.lower(),
                             mid=generated_mid,
-                            machine_type=mapped_type,
+                            machine_type=device.machine_type,
                             created_at=timestamp,
                             is_usable=1
                         )
@@ -298,27 +209,6 @@ async def create_bulk_device_upload(
                                 "created_at": timestamp
                             })
 
-                    # Add device type property
-                    device_type_entity = GeneralProperty(
-                        referrer_id=device.id,
-                        property_type="machine",
-                        property_key="specifications",
-                        property_label="device_type",
-                        property_value=mapped_type,
-                        created_at=timestamp,
-                        is_usable=1
-                    )
-                    db.add(device_type_entity)
-                    db.flush()
-
-                    properties_list.append({
-                        "id": device_type_entity.id,
-                        "property_label": "device_type",
-                        "property_key": "specifications",
-                        "property_value": mapped_type,
-                        "created_at": timestamp
-                    })
-
                     successful_items.append({
                         "id": device.id,
                         "name": device.name,
@@ -354,10 +244,10 @@ async def create_bulk_device_upload(
         )
 
 
-@router.get("/")
-async def get_all_devices(db: Session = Depends(get_db)):
+@router.get("/all")
+async def get_all_devices(machine_type: str = Query(default="%"), db: Session = Depends(get_db)):
     try:
-        devices = db.query(Machine).filter(Machine.is_usable == 1).all()
+        devices = db.query(Machine).filter(Machine.is_usable == 1, Machine.machine_type.like(machine_type)).all()
 
         items = []
         for device in devices:
@@ -399,6 +289,47 @@ async def get_all_devices(db: Session = Depends(get_db)):
         )
 
 
+@router.get("/{machine_id}")
+async def get_device(machine_id: str, db: Session = Depends(get_db)):
+    try:
+        device = db.query(Machine).filter(Machine.is_usable == 1, Machine.id == machine_id).first()
+
+        if device is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Machine not found")
+
+        properties = []
+
+        # Get all properties for this device
+        device_properties = db.query(GeneralProperty).filter(
+            GeneralProperty.referrer_id == device.id,
+            GeneralProperty.property_type == 'machine',
+            GeneralProperty.is_usable == 1
+        ).all()
+
+        # Convert properties to the new format
+        for prop in device_properties:
+            properties.append({
+                "id": prop.id,
+                "property_label": prop.property_label,
+                "property_key": prop.property_key,
+                "property_value": prop.property_value,
+                "created_at": prop.created_at
+            })
+
+        return {
+            "id": device.id,
+            "name": device.name,
+            "created_at": device.created_at,
+            "properties": properties
+        }
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching devices: {str(e)}"
+        )
+
+
 @router.put("/{device_id}")
 async def update_device(
         device_id: int,
@@ -418,20 +349,12 @@ async def update_device(
         if not existing_device:
             raise HTTPException(status_code=404, detail=f"Device with ID {device_id} not found")
 
-        # Validate device type
-        mapped_type = DEVICE_TYPE_MAPPING.get(device.machine_type.lower())
-        if not mapped_type:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Invalid device type: {device.machine_type}. Must be one of: {', '.join(DEVICE_TYPE_MAPPING.keys())}"
-            )
-
         timestamp = int(time.time())
         properties_list = []
 
         # Update device details
         existing_device.name = device.name.lower()
-        existing_device.machine_type = mapped_type
+        existing_device.machine_type = device.machine_type
         db.flush()
 
         # Set all existing properties as not usable
@@ -502,7 +425,7 @@ async def update_device(
             property_type="machine",
             property_key="specifications",
             property_label="device_type",
-            property_value=mapped_type,
+            property_value=device.machine_type,
             created_at=timestamp,
             is_usable=1
         )
@@ -513,7 +436,7 @@ async def update_device(
             "id": device_type_entity.id,
             "property_label": "device_type",
             "property_key": "specifications",
-            "property_value": mapped_type,
+            "property_value": device.machine_type,
             "created_at": timestamp
         })
 

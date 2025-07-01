@@ -14,6 +14,7 @@ from app.routers.product import router as product_router
 from app.routers.general_property import router as property_router
 from app.routers.signin import router as signin_router
 from app.routers.users import router as user_router
+from app.routers.pipeline_input import router as pipeline_input_router
 
 # ... other router imports ...
 
@@ -42,6 +43,7 @@ app.include_router(product_router)
 app.include_router(property_router)
 app.include_router(signin_router)
 app.include_router(user_router)
+app.include_router(pipeline_input_router)
 # ... other routers ...
 
 # Create database tables

@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from typing import Literal, Optional
 
+
 class GeneralPropertyBase(BaseModel):
     referrer_id: int
     property_type: Literal['machine', 'pipeline', 'application', 'pipeline_input']
@@ -10,9 +11,10 @@ class GeneralPropertyBase(BaseModel):
     tags: Optional[str] = ""
     is_usable: int = 1
 
+
 class GeneralPropertyResponse(GeneralPropertyBase):
     id: int
     created_at: int
-    
+
     class Config:
         from_attributes = True
