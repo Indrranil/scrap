@@ -291,43 +291,36 @@ async def get_all_devices(machine_type: str = Query(default="%"), db: Session = 
 
 @router.get("/{machine_id}")
 async def get_device(machine_id: str, db: Session = Depends(get_db)):
-    try:
-        device = db.query(Machine).filter(Machine.is_usable == 1, Machine.id == machine_id).first()
+    device = db.query(Machine).filter(Machine.is_usable == 1, Machine.id == machine_id).first()
 
-        if device is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Machine not found")
+    if device is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Machine not found")
 
-        properties = []
+    properties = []
 
-        # Get all properties for this device
-        device_properties = db.query(GeneralProperty).filter(
-            GeneralProperty.referrer_id == device.id,
-            GeneralProperty.property_type == 'machine',
-            GeneralProperty.is_usable == 1
-        ).all()
+    # Get all properties for this device
+    device_properties = db.query(GeneralProperty).filter(
+        GeneralProperty.referrer_id == device.id,
+        GeneralProperty.property_type == 'machine',
+        GeneralProperty.is_usable == 1
+    ).all()
 
-        # Convert properties to the new format
-        for prop in device_properties:
-            properties.append({
-                "id": prop.id,
-                "property_label": prop.property_label,
-                "property_key": prop.property_key,
-                "property_value": prop.property_value,
-                "created_at": prop.created_at
-            })
+    # Convert properties to the new format
+    for prop in device_properties:
+        properties.append({
+            "id": prop.id,
+            "property_label": prop.property_label,
+            "property_key": prop.property_key,
+            "property_value": prop.property_value,
+            "created_at": prop.created_at
+        })
 
-        return {
-            "id": device.id,
-            "name": device.name,
-            "created_at": device.created_at,
-            "properties": properties
-        }
-
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching devices: {str(e)}"
-        )
+    return {
+        "id": device.id,
+        "name": device.name,
+        "created_at": device.created_at,
+        "properties": properties
+    }
 
 
 @router.put("/{device_id}")
