@@ -41,7 +41,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
     def __init__(self, app):
         super().__init__(app)
         self.auth = KeycloakAuth()
-        self.public_paths = {"/docs", "/openapi.json", "/redoc", "/v1/auth/signin"}
+        self.public_paths = {"/docs", "/openapi.json", "/redoc", "/v1/auth/signin", "/"}
 
     async def dispatch(self, request: Request, call_next):
         if request.url.path in self.public_paths or request.method == "OPTIONS" or request.url.path.startswith("/frame"):
