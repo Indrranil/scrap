@@ -1,6 +1,5 @@
 import logging
 import time
-from typing import List
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
@@ -72,16 +71,19 @@ async def get_all_pipelines(db: Session = Depends(get_db)):
         items = []
         for pipeline in pipelines:
             properties = []
+            added_property_keys = []
 
             # Get all properties for this device
             device_properties = db.query(GeneralProperty).filter(
                 GeneralProperty.referrer_id == pipeline.id,
                 GeneralProperty.property_type == 'pipeline',
                 GeneralProperty.is_usable == 1
-            ).all()
+            ).order_by(GeneralProperty.id.desc()).all()
 
             # Convert properties to the new format
             for prop in device_properties:
+                if prop.property_key + prop.property_label in added_property_keys:
+                    continue
                 properties.append({
                     "id": prop.id,
                     "property_label": prop.property_label,
@@ -89,6 +91,7 @@ async def get_all_pipelines(db: Session = Depends(get_db)):
                     "property_value": prop.property_value,
                     "created_at": prop.created_at
                 })
+                added_property_keys.append(prop.property_key + prop.property_label)
 
             items.append({
                 **vars(pipeline),

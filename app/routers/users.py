@@ -1,4 +1,5 @@
 from io import StringIO
+from os import getenv
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException, UploadFile, File
@@ -9,7 +10,7 @@ router = APIRouter(prefix="/v1/users", tags=["users"])
 
 # Initialize Keycloak Admin
 keycloak_admin = KeycloakAdmin(
-    server_url="http://localhost:8080",
+    server_url=str(getenv("KEYCLOAK_URL")),
     username="admin",
     password="admin_password",
     realm_name="master",
