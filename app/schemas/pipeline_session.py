@@ -47,4 +47,4 @@ class Limit(BaseModel):
 
 
 class BasicFilter(Sort, Limit):
-    pass
+    last_index: Optional[int] = 0
