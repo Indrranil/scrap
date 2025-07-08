@@ -2,11 +2,14 @@ from io import StringIO
 from os import getenv
 
 import pandas as pd
+from dotenv import load_dotenv
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from keycloak import KeycloakAdmin
 from app.schemas.user import UserCreate, UsersListResponse, UserResponse, UserUpdate
 
 router = APIRouter(prefix="/v1/users", tags=["users"])
+
+load_dotenv()
 
 # Initialize Keycloak Admin
 keycloak_admin = KeycloakAdmin(

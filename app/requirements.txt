@@ -1,6 +1,7 @@
 # python 3.10
-fastapi[standard]
+fastapi==0.105.0
 uvicorn
+wsproto
 sqlalchemy
 pymysql
 python-keycloak 

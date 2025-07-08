@@ -113,7 +113,8 @@ async def websocket_endpoint(websocket: WebSocket, cam: str):
             f = await websocket.receive_text()
             output_stream_router.send_frame(cam, f)
             time.sleep(0.02)
-        except WebSocketDisconnect:
+        except WebSocketDisconnect as err:
+            print(err)
             print('Websocket disconnected :)')
             break
         except KeyboardInterrupt:
