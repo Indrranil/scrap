@@ -82,9 +82,9 @@ async def get_all_pipeline_sessions(
                 db.query(PipelineSessionOutput)
                 .filter(
                     PipelineSessionOutput.pipeline_session_id == session.id,
-                    PipelineSessionOutput.id > filters.last_index,
+                    PipelineSessionOutput.id > filters.last_index if filters.last_index <= 0 else PipelineSessionOutput.id < filters.last_index,
                     PipelineSessionOutput.is_usable == 1
-                ).limit(15)
+                ).order_by(PipelineSessionOutput.id.desc()).limit(15)
                 .all()
             )
 

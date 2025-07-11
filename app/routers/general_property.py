@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
-from app.schemas.general_property import GeneralPropertyBase
-
+from app.schemas.general_property import GeneralPropertyBase, GeneralPropertyUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/general-property", tags=["General Property"])
@@ -102,3 +101,22 @@ async def create_general_property(
             status_code=500,
             detail=f"Error creating pipeline: {str(e)}"
         )
+
+
+@router.patch("/{general_property_id}/update")
+async def update_general_property(general_property_id: int, general_property_update_payload: GeneralPropertyUpdate, db: Session = Depends(get_db)):
+    existing_general_property = db.query(GeneralProperty).filter(GeneralProperty.id == general_property_id)
+
+    if not existing_general_property.first():
+        raise HTTPException(
+            status_code=404,
+            detail=f"General property with ID {general_property_id} not found"
+        )
+
+    existing_general_property.update({
+            GeneralProperty.property_value: general_property_update_payload.property_value,
+            GeneralProperty.created_at: time.time()
+         })
+    db.commit()
+
+    return
