@@ -1,4 +1,5 @@
 import time
+from typing import List
 
 from app.auth.auth import require_roles
 from app.database.connection import get_db
@@ -7,6 +8,7 @@ from app.models.pipeline_session import PipelineSession as PipelineSessionModel
 from app.models.pipeline_session_output import PipelineSessionOutput
 from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
 from app.schemas.pipeline_session import PipelineSessionCreate, PipelineSession, BasicFilter
+from app.services.pipeline_session import pipeline_session_service
 from sqlalchemy.orm import Session
 
 router = APIRouter(prefix="/v1/pipeline-session", tags=["pipeline-session"])
@@ -19,30 +21,9 @@ async def create_pipeline_session(
         db: Session = Depends(get_db),
         _: bool = Depends(require_roles(["app_admin"]))
 ):
-    try:
-        user_id = request.state.user["id"]
-        db.begin()
-        timestamp = int(time.time())
-
-        new_session = PipelineSessionModel(
-            pipeline_id=pipeline_session.pipeline_id,
-            pipeline_input_id=pipeline_session.pipeline_input_id,
-            name=pipeline_session.name,
-            created_by=user_id,
-            created_at=timestamp,
-            ended_at=pipeline_session.ended_at,
-            is_usable=1
-        )
-
-        db.add(new_session)
-        db.commit()
-        db.refresh(new_session)
-
-        return new_session
-
-    except Exception as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail=str(e))
+    """Create a new pipeline session with authentication."""
+    user_id = request.state.user["id"]
+    return pipeline_session_service.create_with_user(db, obj_in=pipeline_session, user_id=user_id)
 
 
 @router.get("/all")

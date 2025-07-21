@@ -13,3 +13,7 @@ pyjwt
 pytest 
 pytest-asyncio 
 httpx
+python-dotenv
+pandas
+python-multipart
+pydantic[email]
