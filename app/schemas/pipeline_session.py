@@ -1,7 +1,7 @@
 # schemas/pipeline_session.py
 from fastapi import HTTPException
 from pydantic import BaseModel, field_validator
-from typing import Optional
+from typing import Optional, Union
 
 from starlette import status
 
@@ -10,7 +10,7 @@ class PipelineSessionBase(BaseModel):
     pipeline_id: int  # Changed from application_id
     pipeline_input_id: Optional[int] = None
     name: Optional[str] = None
-    created_by: Optional[str] = None
+    created_by: Optional[Union[str, int]] = None
     ended_at: Optional[int] = None
 
 
