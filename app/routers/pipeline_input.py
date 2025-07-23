@@ -22,10 +22,31 @@ async def create_pipeline_input(
     return pipeline_input_service.create(db, obj_in=pipeline_input)
 
 
-@router.get("/all", response_model=List[PipelineInputResponse])
+@router.get("/all")
 async def get_all_pipeline_input(db: Session = Depends(get_db)):
     """Get all active pipeline inputs."""
-    return pipeline_input_service.get_all(db)
+    try:
+        pipeline_inputs = pipeline_input_service.get_all(db)
+        
+        items = []
+        for pipeline_input in pipeline_inputs:
+            items.append({
+                "id": pipeline_input.id,
+                "name": pipeline_input.name,
+                "created_at": pipeline_input.created_at,
+                "is_usable": pipeline_input.is_usable
+            })
+        
+        return {
+            "total": len(items),
+            "items": items
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching pipeline inputs: {str(e)}"
+        )
 
 
 @router.get("/{pipeline_input_id}", response_model=PipelineInputResponse)

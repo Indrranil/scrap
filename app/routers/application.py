@@ -22,12 +22,33 @@ async def create_application(
     return application_service.create(db, obj_in=application)
 
 
-@router.get("/all", response_model=List[Application])
+@router.get("/all")
 async def get_all_applications(
         db: Session = Depends(get_db)
 ):
     """Get all active applications."""
-    return application_service.get_all(db)
+    try:
+        applications = application_service.get_all(db)
+        
+        items = []
+        for application in applications:
+            items.append({
+                "id": application.id,
+                "name": application.name,
+                "created_at": application.created_at,
+                "is_usable": application.is_usable
+            })
+        
+        return {
+            "total": len(items),
+            "items": items
+        }
+    
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching applications: {str(e)}"
+        )
 
 
 @router.get("/{application_id}", response_model=Application)
