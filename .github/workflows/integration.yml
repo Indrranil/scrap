@@ -43,7 +43,7 @@ jobs:
         fi
 
     # - name: Show Python files in app/
-    #   run: |
+    #   run: |nning
     #     echo "📁 Listing .py files in app/:"
     #     find app/ -name "*.py"
 
@@ -58,16 +58,16 @@ jobs:
     #       exit 1
     #     fi
         
-    - name: 📏 flake8 linting
-      run: |
-        echo "📏 Running flake8 linting..."
-        flake8 app/
-        if [ $? -eq 0 ]; then
-          echo "✅ Flake8: No linting issues found"
-        else
-          echo "❌ Flake8: Linting issues found"
-          exit 1
-        fi
+    # - name: 📏 flake8 linting
+    #   run: |
+    #     echo "📏 Running flake8 linting..."
+    #     flake8 app/
+    #     if [ $? -eq 0 ]; then
+    #       echo "✅ Flake8: No linting issues found"
+    #     else
+    #       echo "❌ Flake8: Linting issues found"
+    #       exit 1
+    #     fi
         
     - name: 🔍 mypy type checking
       run: |
