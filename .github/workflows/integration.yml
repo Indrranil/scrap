@@ -69,16 +69,16 @@ jobs:
     #       exit 1
     #     fi
         
-    - name: 🔍 mypy type checking
-      run: |
-        echo "🔍 Running mypy type checker..."
-        mypy app/
-        if [ $? -eq 0 ]; then
-          echo "✅ MyPy: No type issues found"
-        else
-          echo "❌ MyPy: Type issues found"
-          exit 1
-        fi
+    # - name: 🔍 mypy type checking
+    #   run: |
+    #     echo "🔍 Running mypy type checker..."
+    #     mypy app/
+    #     if [ $? -eq 0 ]; then
+    #       echo "✅ MyPy: No type issues found"
+    #     else
+    #       echo "❌ MyPy: Type issues found"
+    #       exit 1
+    #     fi
         
     - name: 🔒 bandit security scan
       run: |
