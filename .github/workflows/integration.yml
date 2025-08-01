@@ -41,17 +41,22 @@ jobs:
           echo "❌ Black: Code formatting issues found"
           exit 1
         fi
-        
+
+    - name: Show Python files in app/
+      run: |
+        echo "📁 Listing .py files in app/:"
+        find app/ -name "*.py"
+
     - name: 📋 isort import sorting check
       run: |
         echo "📋 Running isort import sorter..."
-        if isort --check-only --diff app/; then
+        isort --check-only --diff app/
+        if [ $? -eq 0 ]; then
           echo "✅ isort: Imports are properly sorted"
         else
           echo "❌ isort: Import sorting issues found"
           exit 1
         fi
-
         
     - name: 📏 flake8 linting
       run: |
