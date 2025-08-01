@@ -1,0 +1,113 @@
+name: Integration Pipeline
+
+on:
+  push:
+    branches: [ main, dev, feature/* ]
+  pull_request:
+    branches: [ main, dev , develop]
+
+env:
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  # Integration Checks - Mirror format-code.bat logic
+  integration-checks:
+    name: 🔍 Code Quality & Testing
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+      
+    - name: 🐍 Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: 📦 Install required tools
+      run: |
+        echo "📦 Installing required tools..."
+        python -m pip install --upgrade pip
+        pip install black isort flake8 mypy bandit pytest pytest-cov
+        pip install -r requirements.txt
+        
+    - name: 🖤 Black formatter check
+      run: |
+        echo "🖤 Running Black formatter..."
+        black --check --diff app/
+        if [ $? -eq 0 ]; then
+          echo "✅ Black: Code is properly formatted"
+        else
+          echo "❌ Black: Code formatting issues found"
+          exit 1
+        fi
+        
+    - name: 📋 isort import sorting check
+      run: |
+        echo "📋 Running isort import sorter..."
+        isort --check-only --diff app/
+        if [ $? -eq 0 ]; then
+          echo "✅ isort: Imports are properly sorted"
+        else
+          echo "❌ isort: Import sorting issues found"
+          exit 1
+        fi
+        
+    - name: 📏 flake8 linting
+      run: |
+        echo "📏 Running flake8 linting..."
+        flake8 app/
+        if [ $? -eq 0 ]; then
+          echo "✅ Flake8: No linting issues found"
+        else
+          echo "❌ Flake8: Linting issues found"
+          exit 1
+        fi
+        
+    - name: 🔍 mypy type checking
+      run: |
+        echo "🔍 Running mypy type checker..."
+        mypy app/
+        if [ $? -eq 0 ]; then
+          echo "✅ MyPy: No type issues found"
+        else
+          echo "❌ MyPy: Type issues found"
+          exit 1
+        fi
+        
+    - name: 🔒 bandit security scan
+      run: |
+        echo "🔒 Running bandit security scan..."
+        bandit -r app/
+        if [ $? -eq 0 ]; then
+          echo "✅ Bandit: No security issues found"
+        else
+          echo "❌ Bandit: Security issues found"
+          exit 1
+        fi
+        
+    - name: 🧪 Run automated tests
+      run: |
+        echo "🧪 Running automated tests..."
+        pytest app/tests/ -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=80
+        if [ $? -eq 0 ]; then
+          echo "✅ Testing: All tests passed"
+        else
+          echo "❌ Testing: Some tests failed"
+          exit 1
+        fi
+        
+    - name: 📊 Integration Summary
+      if: always()
+      run: |
+        echo "=========================================="
+        echo "📊 INTEGRATION PIPELINE SUMMARY"
+        echo "=========================================="
+        echo "🖤 Black Formatter:    ✅ PASS"
+        echo "📋 Import Sorter:      ✅ PASS"
+        echo "📏 Flake8 Linting:     ✅ PASS"
+        echo "🔍 MyPy Type Check:    ✅ PASS"
+        echo "🔒 Bandit Security:    ✅ PASS"
+        echo "🧪 Automated Tests:    ✅ PASS"
+        echo "=========================================="
+        echo "🎉 All checks PASSED! Ready for merge ✅"

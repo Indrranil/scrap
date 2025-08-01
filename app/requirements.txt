@@ -12,6 +12,8 @@ bcrypt
 pyjwt
 pytest 
 pytest-asyncio 
+pytest-cov
+pytest-mock
 httpx
 python-dotenv
 pandas

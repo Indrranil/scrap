@@ -1,11 +1,14 @@
-from pydantic import BaseModel
 from enum import Enum
 from typing import Optional
+
+from pydantic import BaseModel
+
 
 class MachineType(str, Enum):
     weight_machine = "weight machine"
     perforation = "perforation"
     rejector = "rejector"
+
 
 class MachineBase(BaseModel):
     mid: str

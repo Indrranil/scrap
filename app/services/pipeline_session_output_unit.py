@@ -1,13 +1,24 @@
-from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit as PipelineSessionOutputUnitModel
-from app.schemas.pipeline_session_output_unit import PipelineSessionOutputUnitCreate, PipelineSessionOutputUnit
+from app.models.pipeline_session_output_unit import (
+    PipelineSessionOutputUnit as PipelineSessionOutputUnitModel,
+)
+from app.schemas.pipeline_session_output_unit import (
+    PipelineSessionOutputUnit,
+    PipelineSessionOutputUnitCreate,
+)
 from app.services.base import CRUDBase
 
 
-class PipelineSessionOutputUnitService(CRUDBase[PipelineSessionOutputUnitModel, PipelineSessionOutputUnitCreate, PipelineSessionOutputUnitCreate]):
+class PipelineSessionOutputUnitService(
+    CRUDBase[
+        PipelineSessionOutputUnitModel,
+        PipelineSessionOutputUnitCreate,
+        PipelineSessionOutputUnitCreate,
+    ]
+):
     """
     Pipeline Session Output Unit-specific CRUD service.
     """
-    
+
     def __init__(self):
         super().__init__(PipelineSessionOutputUnitModel)
 

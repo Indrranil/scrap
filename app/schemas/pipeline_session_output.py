@@ -1,5 +1,6 @@
-from pydantic import BaseModel
 from typing import Optional
+
+from pydantic import BaseModel
 
 from app.schemas.pipeline_session_output_unit import PipelineSessionOutputUnitBase
 

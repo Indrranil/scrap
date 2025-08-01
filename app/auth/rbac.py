@@ -1,10 +1,9 @@
 import logging
 from enum import Enum
-from typing import Set, List, Dict
-
-from fastapi import Depends
+from typing import Dict, List, Set
 
 from auth import AuthorizationError, get_current_user
+from fastapi import Depends
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +33,15 @@ class RBACHandler:
             role_perms = self.role_permissions.get(role, set())
             user_permissions.update(role_perms)
 
-        return Permission.ALL.value in user_permissions or required_permission in user_permissions
+        return (
+            Permission.ALL.value in user_permissions
+            or required_permission in user_permissions
+        )
 
     def require_permission(self, required_permission: str):
         """Dependency creator for permission-based access control"""
 
-        async def permission_dependency(
-                user: Dict = Depends(get_current_user)
-        ) -> bool:
+        async def permission_dependency(user: Dict = Depends(get_current_user)) -> bool:
             user_roles = user.get("roles", [])
 
             if not self._has_permission(user_roles, required_permission):

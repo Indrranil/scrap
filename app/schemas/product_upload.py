@@ -1,5 +1,7 @@
+from typing import Any, Dict, Optional
+
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any
+
 
 class ProductUploadCreate(BaseModel):
     variant_name: str = Field(..., alias="Variant Name")
@@ -16,12 +18,12 @@ class ProductUploadCreate(BaseModel):
     factory_code: Optional[str] = Field(None, alias="Factory Code")
     target_weight: Optional[float] = Field(None, alias="Target Weight (g)")
     tare_weight: Optional[float] = Field(None, alias="Tare Weight (g)")
-    front_face : Optional[str] = Field(None, alias="Front Face")
-    back_face : Optional[str] = Field(None, alias="Back Face")
-    left_face : Optional[str] = Field(None, alias="Left Face")
-    right_face : Optional[str] = Field(None, alias="Right Face")
-    top_face : Optional[str] = Field(None, alias="Top Face")
-    bottom_face : Optional[str] = Field(None, alias="Bottom Face")
+    front_face: Optional[str] = Field(None, alias="Front Face")
+    back_face: Optional[str] = Field(None, alias="Back Face")
+    left_face: Optional[str] = Field(None, alias="Left Face")
+    right_face: Optional[str] = Field(None, alias="Right Face")
+    top_face: Optional[str] = Field(None, alias="Top Face")
+    bottom_face: Optional[str] = Field(None, alias="Bottom Face")
     damage: Optional[str] = Field(None, alias="Damage")
     flap_open: Optional[str] = Field(None, alias="Flap Open")
     grease_dirt: Optional[str] = Field(None, alias="Grease Dirt")

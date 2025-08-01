@@ -3,11 +3,13 @@ from app.schemas.pipeline_input import PipelineInputBase, PipelineInputResponse
 from app.services.base import CRUDBase
 
 
-class PipelineInputService(CRUDBase[PipelineInputModel, PipelineInputBase, PipelineInputBase]):
+class PipelineInputService(
+    CRUDBase[PipelineInputModel, PipelineInputBase, PipelineInputBase]
+):
     """
     Pipeline Input-specific CRUD service.
     """
-    
+
     def __init__(self):
         super().__init__(PipelineInputModel)
 

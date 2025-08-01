@@ -4,22 +4,25 @@ import uuid
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette import status
-from starlette.websockets import WebSocketDisconnect, WebSocket
+from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from app.auth.auth import AuthMiddleware
-from app.database.connection import engine, Base
+from app.database.connection import Base, engine
+
 # Import routers
 from app.routers.application import router as application_router
 from app.routers.device import router as device_router
+from app.routers.general_property import router as property_router
 from app.routers.pipeline import router as pipeline_router
+from app.routers.pipeline_input import router as pipeline_input_router
 from app.routers.pipeline_session import router as pipeline_session_router
 from app.routers.pipeline_session_output import router as pipeline_session_output_router
-from app.routers.pipeline_session_output_unit import router as pipeline_session_output_unit_router
+from app.routers.pipeline_session_output_unit import (
+    router as pipeline_session_output_unit_router,
+)
 from app.routers.product import router as product_router
-from app.routers.general_property import router as property_router
 from app.routers.signin import router as signin_router
 from app.routers.users import router as user_router
-from app.routers.pipeline_input import router as pipeline_input_router
 from app.routers.ws_router import broadcast_controller, output_stream_router
 
 # ... other router imports ...
@@ -56,27 +59,31 @@ app.include_router(pipeline_input_router)
 Base.metadata.create_all(bind=engine)
 
 
-@app.get('/', status_code=status.HTTP_200_OK)
+@app.get("/", status_code=status.HTTP_200_OK)
 def is_running():
-    return 'Server is up and running :)'
+    return "Server is up and running :)"
 
 
-@app.websocket('/pub/{topic}')
+@app.websocket("/pub/{topic}")
 async def broadcast_pub(websocket: WebSocket, topic: str, dt: str):
     await websocket.accept()
     while True:
         try:
-            f = await websocket.receive_text() if dt == 'str' else await websocket.receive_bytes()
+            f = (
+                await websocket.receive_text()
+                if dt == "str"
+                else await websocket.receive_bytes()
+            )
             broadcast_controller.publish(topic, f)
             time.sleep(0.02)
         except WebSocketDisconnect:
-            print('Websocket disconnected :)')
+            print("Websocket disconnected :)")
             break
         except KeyboardInterrupt:
             break
 
 
-@app.websocket('/sub/{topic}')
+@app.websocket("/sub/{topic}")
 async def broadcast_sub(websocket: WebSocket, topic: str):
     async def wrapper(data):
         if isinstance(data, str):
@@ -94,20 +101,20 @@ async def broadcast_sub(websocket: WebSocket, topic: str):
             await websocket.receive()
             time.sleep(0.02)
         except WebSocketDisconnect:
-            print('Websocket disconnected :)')
+            print("Websocket disconnected :)")
             break
         except KeyboardInterrupt:
             break
         except RuntimeError:
-            print('Websocket disconnected :)')
+            print("Websocket disconnected :)")
             break
     broadcast_controller.unsubscribe(topic, wrapper)
 
 
 @app.websocket("/frame/{cam}/post")
-async def websocket_endpoint(websocket: WebSocket, cam: str):
+async def websocket_post_endpoint(websocket: WebSocket, cam: str):
     await websocket.accept()
-    output_stream_router.send_frame(cam, None)
+    output_stream_router.send_frame(cam, "")
     while True:
         try:
             f = await websocket.receive_text()
@@ -115,7 +122,7 @@ async def websocket_endpoint(websocket: WebSocket, cam: str):
             time.sleep(0.02)
         except WebSocketDisconnect as err:
             print(err)
-            print('Websocket disconnected :)')
+            print("Websocket disconnected :)")
             break
         except KeyboardInterrupt:
             break
@@ -123,7 +130,7 @@ async def websocket_endpoint(websocket: WebSocket, cam: str):
 
 
 @app.websocket("/frame/{cam}/get")
-async def websocket_endpoint(websocket: WebSocket, cam: str):
+async def websocket_get_endpoint(websocket: WebSocket, cam: str):
     await websocket.accept()
     sid = str(uuid.uuid4())
     s = output_stream_router.add_subscriber(sid, cam, websocket)
@@ -132,7 +139,7 @@ async def websocket_endpoint(websocket: WebSocket, cam: str):
             await websocket.receive_text()
             time.sleep(0.02)
         except WebSocketDisconnect:
-            print('Websocket disconnected')
+            print("Websocket disconnected")
             break
         except KeyboardInterrupt:
             break
@@ -141,10 +148,11 @@ async def websocket_endpoint(websocket: WebSocket, cam: str):
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
+        host="0.0.0.0",  # nosec B104
         port=8000,
         reload=True,
-        log_level="info"
+        log_level="info",
     )

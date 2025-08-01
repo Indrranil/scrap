@@ -1,7 +1,9 @@
-from pydantic import BaseModel
-from typing import Optional, Literal
+from typing import Literal, Optional
 
-PropertyType = Literal['machine', 'pipeline', 'application', 'pipeline_input']
+from pydantic import BaseModel
+
+PropertyType = Literal["machine", "pipeline", "application", "pipeline_input"]
+
 
 class PropertyDescriptionBase(BaseModel):
     property_type: PropertyType
@@ -11,11 +13,14 @@ class PropertyDescriptionBase(BaseModel):
     property_label: str
     is_usable: int
 
+
 class PropertyDescriptionCreate(PropertyDescriptionBase):
     pass
+
 
 class PropertyDescription(PropertyDescriptionBase):
     id: int
     created_at: int
+
     class Config:
         from_attributes = True

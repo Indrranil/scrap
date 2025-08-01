@@ -1,11 +1,16 @@
-from sqlalchemy import Column, Integer, String, BigInteger, Enum
+import enum
+
+from sqlalchemy import BigInteger, Column, Enum, Integer, String
+
 from app.database.connection import Base
+
 
 class PropertyType(enum.Enum):
     machine = "machine"
     pipeline = "pipeline"
     application = "application"
     pipeline_input = "pipeline_input"
+
 
 class PropertyDescription(Base):
     __tablename__ = "property_description"
