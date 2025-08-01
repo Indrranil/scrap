@@ -91,16 +91,17 @@ jobs:
           exit 1
         fi
         
-    # - name: 🧪 Run automated tests
-    #   run: |
-    #     echo "🧪 Running automated tests..."
-    #     pytest app/tests/test_refactored_endpoints.py -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=80
-    #     if [ $? -eq 0 ]; then
-    #       echo "✅ Testing: All tests passed"
-    #     else
-    #       echo "❌ Testing: Some tests failed"
-    #       exit 1
-    #     fi
+    - name: 🧪 Run automated tests
+      run: |
+        echo "🧪 Running automated tests..."
+        pytest app/tests/test_services.py -v --tb=short --cov=app --cov-report=term-missing --cov-fail-under=80
+        if [ $? -eq 0 ]; then
+          echo "✅ Testing: All tests passed"
+        else
+        
+          echo "❌ Testing: Some tests failed"
+          exit 1
+        fi
         
     - name: 📊 Integration Summary
       if: always()
