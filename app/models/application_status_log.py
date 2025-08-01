@@ -27,5 +27,5 @@ class ApplicationStatusLog(Base):
     application_container_id = Column(
         String(255), ForeignKey("application_container.id")
     )
-    value = Column(Enum(ApplicationStatus))
+    value = Column(Enum(ApplicationStatus))  # type: ignore
     created_at = Column(BigInteger)

@@ -25,7 +25,7 @@ class PipelineSessionOutputUnit(Base):
     name = Column(String(100))
     output_key = Column(String(100))
     output_value = Column(String(100))
-    status = Column(Enum(UnitStatus), default=UnitStatus.success)
+    status = Column(Enum(UnitStatus), default=UnitStatus.success)  # type: ignore
     verdict = Column(Integer)
     created_at = Column(Integer)
     is_usable = Column(Integer, default=1)

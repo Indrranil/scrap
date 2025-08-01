@@ -195,14 +195,18 @@ async def update_batch_pipeline_session_output_units(
             raise HTTPException(status_code=404, detail="No matching units found")
 
         update_data = unit_update.model_dump(exclude_unset=True)
-        query.update(update_data)
+        # Convert dict keys to proper column references
+        update_dict = {getattr(PipelineSessionOutputUnitModel, key): value for key, value in update_data.items()}
+        query.update(update_dict)
         db.commit()
 
         # Refresh the query to get updated units
         updated_units = query.all()
 
+        # Convert model instances to schema instances
+        schema_items = [PipelineSessionOutputUnit.model_validate(unit) for unit in updated_units]
         return BatchUpdateResponse(
-            status="success", updated_count=len(updated_units), items=updated_units
+            status="success", updated_count=len(updated_units), items=schema_items
         )
 
     except Exception as e:

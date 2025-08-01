@@ -1,4 +1,4 @@
-from typing import List, Type, TypeVar
+from typing import List, Type, Sequence, TypeVar
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
@@ -18,10 +18,10 @@ def create_crud_router(
     create_schema: Type[CreateSchemaType],
     response_schema: Type[ResponseSchemaType],
     prefix: str,
-    tags: List[str],
+    tags: Sequence[str],
     entity_name: str = None,
 ) -> APIRouter:
-    router = APIRouter(prefix=prefix, tags=tags)
+    router = APIRouter(prefix=prefix, tags=list(tags))
 
     if not entity_name:
         entity_name = service.model.__name__.lower()

@@ -377,8 +377,8 @@ async def update_device(
         properties_list = []
 
         # Update device details
-        existing_device.name = device.name.lower()
-        existing_device.machine_type = device.machine_type
+        existing_device.name = device.name.lower()  # type: ignore
+        existing_device.machine_type = device.machine_type  # type: ignore
         db.flush()
 
         # Set all existing properties as not usable
@@ -506,7 +506,7 @@ async def delete_device(device_id: int, db: Session = Depends(get_db)):
             )
 
         # Soft delete the device
-        device.is_usable = 0
+        device.is_usable = 0  # type: ignore
 
         # Soft delete all associated properties
         db.query(GeneralProperty).filter(

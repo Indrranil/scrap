@@ -57,7 +57,7 @@ async def create_user(user_data: UserCreate):
         user_id = keycloak_admin.create_user(user)
 
         # Add roles if specified
-        if "roles" in user_data and user_data["roles"]:
+        if user_data.roles and len(user_data.roles) > 0:
             try:
                 # Get available roles
                 available_roles = keycloak_admin.get_realm_roles()
@@ -65,7 +65,7 @@ async def create_user(user_data: UserCreate):
 
                 # Filter and assign existing roles
                 roles_to_assign = []
-                for role_name in user_data["roles"]:
+                for role_name in user_data.roles:
                     if role_name in role_dict:
                         roles_to_assign.append(role_dict[role_name])
 

@@ -16,7 +16,7 @@ class PropertyDescription(Base):
     __tablename__ = "property_description"
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
-    property_type = Column(Enum(PropertyType))
+    property_type = Column(Enum(PropertyType))  # type: ignore
     description = Column(String(255))
     property_key = Column(String(255))
     property_value_type = Column(String(255))

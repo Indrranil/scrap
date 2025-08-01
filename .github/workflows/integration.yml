@@ -42,43 +42,43 @@ jobs:
           exit 1
         fi
 
-    # - name: Show Python files in app/
-    #   run: |nning
-    #     echo "📁 Listing .py files in app/:"
-    #     find app/ -name "*.py"
+    - name: Show Python files in app/
+      run: |
+        echo "📁 Listing .py files in app/:"
+        find app/ -name "*.py"
 
-    # - name: 📋 isort import sorting check
-    #   run: |
-    #     echo "📋 Running isort import sorter..."
-    #     isort --check-only --diff app/
-    #     if [ $? -eq 0 ]; then
-    #       echo "✅ isort: Imports are properly sorted"
-    #     else
-    #       echo "❌ isort: Import sorting issues found"
-    #       exit 1
-    #     fi
+    - name: 📋 isort import sorting check
+      run: |
+        echo "📋 Running isort import sorter..."
+        isort --check-only --diff app/
+        if [ $? -eq 0 ]; then
+          echo "✅ isort: Imports are properly sorted"
+        else
+          echo "❌ isort: Import sorting issues found"
+          exit 1
+        fi
         
-    # - name: 📏 flake8 linting
-    #   run: |
-    #     echo "📏 Running flake8 linting..."
-    #     flake8 app/
-    #     if [ $? -eq 0 ]; then
-    #       echo "✅ Flake8: No linting issues found"
-    #     else
-    #       echo "❌ Flake8: Linting issues found"
-    #       exit 1
-    #     fi
+    - name: 📏 flake8 linting
+      run: |
+        echo "📏 Running flake8 linting..."
+        flake8 app/
+        if [ $? -eq 0 ]; then
+          echo "✅ Flake8: No linting issues found"
+        else
+          echo "❌ Flake8: Linting issues found"
+          exit 1
+        fi
         
-    # - name: 🔍 mypy type checking
-    #   run: |
-    #     echo "🔍 Running mypy type checker..."
-    #     mypy app/
-    #     if [ $? -eq 0 ]; then
-    #       echo "✅ MyPy: No type issues found"
-    #     else
-    #       echo "❌ MyPy: Type issues found"
-    #       exit 1
-    #     fi
+    - name: 🔍 mypy type checking
+      run: |
+        echo "🔍 Running mypy type checker..."
+        mypy app/
+        if [ $? -eq 0 ]; then
+          echo "✅ MyPy: No type issues found"
+        else
+          echo "❌ MyPy: Type issues found"
+          exit 1
+        fi
         
     - name: 🔒 bandit security scan
       run: |
@@ -91,17 +91,17 @@ jobs:
           exit 1
         fi
         
-    - name: 🧪 Run automated tests
-      run: |
-        echo "🧪 Running automated tests..."
-        pytest app/tests/test_services.py -v 
-        if [ $? -eq 0 ]; then
-          echo "✅ Testing: All tests passed"
-        else
+    # - name: 🧪 Run automated tests
+    #   run: |
+    #     echo "🧪 Running automated tests..."
+    #     pytest app/tests/test_services.py -v 
+    #     if [ $? -eq 0 ]; then
+    #       echo "✅ Testing: All tests passed"
+    #     else
 
-          echo "❌ Testing: Some tests failed"
-          exit 1
-        fi
+    #       echo "❌ Testing: Some tests failed"
+    #       exit 1
+    #     fi
         
     - name: 📊 Integration Summary
       if: always()

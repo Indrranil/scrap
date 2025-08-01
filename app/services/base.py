@@ -1,6 +1,7 @@
 import logging
 import time
 from typing import Any, Dict, Generic, List, Optional, Protocol, Type, TypeVar, Union
+from sqlalchemy import and_
 
 from fastapi import HTTPException
 from pydantic import BaseModel
@@ -45,7 +46,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         try:
             return (
                 db.query(self.model)
-                .filter(self.model.id == id, self.model.is_usable == 1)
+                .filter(and_(self.model.id == id, self.model.is_usable == 1))  # type: ignore
                 .first()
             )
         except SQLAlchemyError as e:
@@ -63,7 +64,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         try:
             return (
                 db.query(self.model)
-                .filter(self.model.is_usable == 1)
+                .filter(self.model.is_usable == 1)  # type: ignore
                 .offset(skip)
                 .limit(limit)
                 .all()
@@ -79,7 +80,7 @@ class CRUDBase(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             List of all active model instances
         """
         try:
-            return db.query(self.model).filter(self.model.is_usable == 1).all()
+            return db.query(self.model).filter(self.model.is_usable == 1).all()  # type: ignore
         except SQLAlchemyError as e:
             logger.error(f"Error getting all {self.model.__name__}: {e}")
             raise HTTPException(status_code=500, detail="Database error occurred")

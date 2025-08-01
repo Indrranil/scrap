@@ -53,9 +53,9 @@ async def create_pipeline_session_output(
         db.flush()  # Flush to get the new output ID
 
         if pipeline_session_output.pipeline_session_output_unit:
-            pipeline_session_output.pipeline_session_output_unit.pipeline_session_output_id = (
-                new_output.id
-            )
+            # Flush to ensure new_output.id is available
+            db.flush()
+            pipeline_session_output.pipeline_session_output_unit.pipeline_session_output_id = new_output.id  # type: ignore
             # Create pipeline session output unit
             new_output_unit = PipelineSessionOutputUnit(
                 **pipeline_session_output.pipeline_session_output_unit.model_dump(),
@@ -122,7 +122,7 @@ async def get_all_pipeline_session_outputs(
         # If overview=0, include related output units for each output
         result = []
         for output in outputs:
-            output_dict = vars(output)
+            output_dict = dict(vars(output))
 
             # Get related output units
             units = (
@@ -174,7 +174,7 @@ async def get_pipeline_session_output(
             return output
 
         # If overview=0, include related output units
-        output_dict = vars(output)
+        output_dict = dict(vars(output))
 
         # Get related output units
         units = (
@@ -186,7 +186,7 @@ async def get_pipeline_session_output(
             .all()
         )
 
-        output_dict["units"] = [vars(unit) for unit in units]
+        output_dict["units"] = [dict(vars(unit)) for unit in units]
 
         return output_dict
 

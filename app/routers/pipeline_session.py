@@ -66,7 +66,7 @@ async def get_all_pipeline_sessions(
             return {"total": len(sessions), "data": sessions}
 
         # If overview=0, include related outputs and units
-        sessions_arr = [vars(session) for session in sessions]
+        sessions_arr = [dict(vars(session)) for session in sessions]
 
         if filters.last_index is None or filters.last_index <= 0:
             condition = PipelineSessionOutput.id > 0
@@ -89,7 +89,7 @@ async def get_all_pipeline_sessions(
 
             outputs_list = []
             for output in outputs:
-                output_dict = vars(output)
+                output_dict = dict(vars(output))
                 # Get related output units for each output
                 units = (
                     db.query(PipelineSessionOutputUnit)
@@ -101,10 +101,10 @@ async def get_all_pipeline_sessions(
                     .all()
                 )
 
-                output_dict["units"] = [vars(unit) for unit in units]
+                output_dict["units"] = [dict(vars(unit)) for unit in units]
                 outputs_list.append(output_dict)
 
-            sessions_arr[index]["outputs"] = outputs_list
+            sessions_arr[index]["outputs"] = outputs_list  # type: ignore
 
         return {"total": len(sessions), "data": sessions}
     except Exception as e:
@@ -143,7 +143,7 @@ async def get_pipeline_session(
             return session
 
         # If overview=0, include related outputs and units
-        session_dict = vars(session)
+        session_dict = dict(vars(session))
 
         # Get related outputs with eager loading
         outputs = (
@@ -157,7 +157,7 @@ async def get_pipeline_session(
 
         outputs_list = []
         for output in outputs:
-            output_dict = vars(output)
+            output_dict = dict(vars(output))
             # Get related output units for each output
             units = (
                 db.query(PipelineSessionOutputUnit)
@@ -168,10 +168,10 @@ async def get_pipeline_session(
                 .all()
             )
 
-            output_dict["units"] = [vars(unit) for unit in units]
+            output_dict["units"] = [dict(vars(unit)) for unit in units]
             outputs_list.append(output_dict)
 
-        session_dict["outputs"] = outputs_list
+        session_dict["outputs"] = outputs_list  # type: ignore
 
         return session_dict
 

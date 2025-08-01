@@ -479,7 +479,7 @@ async def update_product(
 
         # Update pipeline input name if changed
         if pipeline_input.name != data.variant_name.lower():
-            pipeline_input.name = data.variant_name.lower()
+            pipeline_input.name = data.variant_name.lower()  # type: ignore
             db.flush()
 
         timestamp = int(time.time())
@@ -661,7 +661,7 @@ async def delete_product(
             raise HTTPException(status_code=404, detail="Product not found")
 
         # 2. Soft delete pipeline input
-        pipeline_input.is_usable = 0
+        pipeline_input.is_usable = 0  # type: ignore
 
         db.query(GeneralProperty).filter(
             GeneralProperty.referrer_id == product_id,
