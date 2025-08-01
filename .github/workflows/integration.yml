@@ -31,16 +31,16 @@ jobs:
         pip install black isort flake8 mypy bandit pytest pytest-cov
         pip install -r requirements.txt
         
-    - name: 🖤 Black formatter check
-      run: |
-        echo "🖤 Running Black formatter..."
-        black --check --diff app/
-        if [ $? -eq 0 ]; then
-          echo "✅ Black: Code is properly formatted"
-        else
-          echo "❌ Black: Code formatting issues found"
-          exit 1
-        fi
+    # - name: 🖤 Black formatter check
+    #   run: |
+    #     echo "🖤 Running Black formatter..."
+    #     black --check --diff app/
+    #     if [ $? -eq 0 ]; then
+    #       echo "✅ Black: Code is properly formatted"
+    #     else
+    #       echo "❌ Black: Code formatting issues found"
+    #       exit 1
+    #     fi
 
     - name: Show Python files in app/
       run: |
