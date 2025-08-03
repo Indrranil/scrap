@@ -5,9 +5,9 @@ from typing import Any, Dict, List
 import pandas as pd
 from dotenv import load_dotenv
 from fastapi import APIRouter, File, HTTPException, UploadFile
+from keycloak import KeycloakAdmin  # type: ignore
 
 from app.schemas.user import UserCreate, UserResponse, UsersListResponse, UserUpdate
-from keycloak import KeycloakAdmin  # type: ignore
 
 router = APIRouter(prefix="/v1/users", tags=["users"])
 
