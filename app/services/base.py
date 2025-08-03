@@ -1,7 +1,6 @@
 import logging
 import time
-from typing import (Any, Dict, Generic, List, Optional, Protocol, Type,
-                    TypeVar, Union)
+from typing import Any, Dict, Generic, List, Optional, Protocol, Type, TypeVar, Union
 
 from fastapi import HTTPException
 from pydantic import BaseModel

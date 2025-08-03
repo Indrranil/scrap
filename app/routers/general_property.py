@@ -8,8 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
-from app.schemas.general_property import (GeneralPropertyBase,
-                                          GeneralPropertyUpdate)
+from app.schemas.general_property import GeneralPropertyBase, GeneralPropertyUpdate
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/general-property", tags=["General Property"])

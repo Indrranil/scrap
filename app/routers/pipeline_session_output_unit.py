@@ -7,12 +7,16 @@ from starlette import status
 
 from app.auth.auth import require_roles
 from app.database.connection import get_db
-from app.models.pipeline_session_output_unit import \
-    PipelineSessionOutputUnit as PipelineSessionOutputUnitModel
+from app.models.pipeline_session_output_unit import (
+    PipelineSessionOutputUnit as PipelineSessionOutputUnitModel,
+)
 from app.schemas.pipeline_session_output_unit import (
-    BatchUpdateResponse, PipelineSessionOutputUnit,
-    PipelineSessionOutputUnitCreate, PipelineSessionOutputUnitResponse,
-    PipelineSessionOutputUnitUpdate)
+    BatchUpdateResponse,
+    PipelineSessionOutputUnit,
+    PipelineSessionOutputUnitCreate,
+    PipelineSessionOutputUnitResponse,
+    PipelineSessionOutputUnitUpdate,
+)
 
 router = APIRouter(
     prefix="/v1/pipeline-session-output-unit", tags=["pipeline-session-output-unit"]

@@ -9,8 +9,11 @@ from app.database.connection import get_db
 from app.models.pipeline_session import PipelineSession as PipelineSessionModel
 from app.models.pipeline_session_output import PipelineSessionOutput
 from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
-from app.schemas.pipeline_session import (BasicFilter, PipelineSession,
-                                          PipelineSessionCreate)
+from app.schemas.pipeline_session import (
+    BasicFilter,
+    PipelineSession,
+    PipelineSessionCreate,
+)
 from app.services.pipeline_session import pipeline_session_service
 
 router = APIRouter(prefix="/v1/pipeline-session", tags=["pipeline-session"])
