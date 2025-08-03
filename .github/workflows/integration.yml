@@ -95,6 +95,16 @@ jobs:
       run: |
         echo "🧪 Running automated tests..."
         export PYTHONPATH=$(pwd)
+        export TESTING=1
+        export MYSQL_USER=dummy
+        export MYSQL_PASSWORD=dummy
+        export MYSQL_HOST=localhost
+        export MYSQL_PORT=3306
+        export MYSQL_DATABASE=test
+        export KEYCLOAK_URL=http://dummy
+        export KEYCLOAK_CLIENT_ID=dummy
+        export KEYCLOAK_CLIENT_SECRET=dummy
+        export KEYCLOAK_REALM=dummy
         pytest app/auto_tests/test_services.py -v 
         if [ $? -eq 0 ]; then
           echo "🧪 Testing: All tests passed"
