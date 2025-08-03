@@ -385,7 +385,7 @@ async def create_bulk_product_upload(
             except Exception as e:
                 failed_items.append(
                     {
-                        "row": index + 2, # type: ignore
+                        "row": index + 2,  # type: ignore
                         "variant_name": row.get("Variant Name", "Unknown"),
                         "error": str(e),
                     }
