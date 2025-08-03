@@ -22,7 +22,7 @@ keycloak_admin = KeycloakAdmin(
     verify=True,
 )
 
-keycloak_admin.realm_name = "app-realm"
+keycloak_admin.realm_name = "app-realm" # type: ignore
 
 
 @router.post("/")
