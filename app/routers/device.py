@@ -230,7 +230,7 @@ async def create_bulk_device_upload(
             except Exception as e:
                 failed_items.append(
                     {
-                        "row": index + 2,
+                        "row": index + 2, # type: ignore
                         "name": row.get("name", "Unknown"),
                         "error": str(e),
                     }
