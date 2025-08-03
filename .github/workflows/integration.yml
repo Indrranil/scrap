@@ -28,7 +28,7 @@ jobs:
       run: |
         echo "📦 Installing required tools..."
         python -m pip install --upgrade pip
-        pip install black isort flake8 mypy bandit pytest pytest-cov
+        pip install black isort flake8 mypy bandit pytest pytest-cov types-requests pandas-stubs
         pip install -r app/requirements.txt
         
     # - name: 🖤 Black formatter check
@@ -72,6 +72,7 @@ jobs:
     - name: 🔍 mypy type checking
       run: |
         echo "🔍 Running mypy type checker..."
+        export PYTHONPATH=$(pwd)
         mypy app/
         if [ $? -eq 0 ]; then
           echo "✅ MyPy: No type issues found"
