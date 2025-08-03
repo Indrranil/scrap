@@ -47,16 +47,16 @@ jobs:
         echo "📁 Listing .py files in app/:"
         find app/ -name "*.py"
 
-    # - name: 📋 isort import sorting check
-    #   run: |
-    #     echo "📋 Running isort import sorter..."
-    #     isort --check-only --diff app/
-    #     if [ $? -eq 0 ]; then
-    #       echo "✅ isort: Imports are properly sorted"
-    #     else
-    #       echo "❌ isort: Import sorting issues found"
-    #       exit 1
-    #     fi
+    - name: 📋 isort import sorting check
+      run: |
+        echo "📋 Running isort import sorter..."
+        isort --check-only app/
+        if [ $? -eq 0 ]; then
+          echo "✅ isort: Imports are properly sorted"
+        else
+          echo "❌ isort: Import sorting issues found"
+          exit 1
+        fi
         
     - name: 📏 flake8 linting
       run: |

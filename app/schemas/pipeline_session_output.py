@@ -2,7 +2,8 @@ from typing import Optional
 
 from pydantic import BaseModel
 
-from app.schemas.pipeline_session_output_unit import PipelineSessionOutputUnitBase
+from app.schemas.pipeline_session_output_unit import \
+    PipelineSessionOutputUnitBase
 
 
 class PipelineSessionOutputBase(BaseModel):

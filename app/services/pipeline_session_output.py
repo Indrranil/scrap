@@ -1,10 +1,7 @@
-from app.models.pipeline_session_output import (
-    PipelineSessionOutput as PipelineSessionOutputModel,
-)
-from app.schemas.pipeline_session_output import (
-    PipelineSessionOutput,
-    PipelineSessionOutputCreate,
-)
+from app.models.pipeline_session_output import \
+    PipelineSessionOutput as PipelineSessionOutputModel
+from app.schemas.pipeline_session_output import (PipelineSessionOutput,
+                                                 PipelineSessionOutputCreate)
 from app.services.base import CRUDBase
 
 

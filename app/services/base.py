@@ -1,10 +1,11 @@
 import logging
 import time
-from typing import Any, Dict, Generic, List, Optional, Protocol, Type, TypeVar, Union
-from sqlalchemy import and_
+from typing import (Any, Dict, Generic, List, Optional, Protocol, Type,
+                    TypeVar, Union)
 
 from fastapi import HTTPException
 from pydantic import BaseModel
+from sqlalchemy import and_
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 

@@ -1,4 +1,4 @@
-from typing import List, Type, Sequence, TypeVar
+from typing import List, Sequence, Type, TypeVar
 
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
