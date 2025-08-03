@@ -58,21 +58,20 @@ jobs:
     #       exit 1
     #     fi
         
-    # - name: 📏 flake8 linting
-    #   run: |
-    #     echo "📏 Running flake8 linting..."
-    #     flake8 app/
-    #     if [ $? -eq 0 ]; then
-    #       echo "✅ Flake8: No linting issues found"
-    #     else
-    #       echo "❌ Flake8: Linting issues found"
-    #       exit 1
-    #     fi
+    - name: 📏 flake8 linting
+      run: |
+        echo "📏 Running flake8 linting..."
+        flake8 app/
+        if [ $? -eq 0 ]; then
+          echo "✅ Flake8: No linting issues found"
+        else
+          echo "❌ Flake8: Linting issues found"
+          exit 1
+        fi
         
     - name: 🔍 mypy type checking
       run: |
         echo "🔍 Running mypy type checker..."
-        export PYTHONPATH=$(pwd)
         mypy app/
         if [ $? -eq 0 ]; then
           echo "✅ MyPy: No type issues found"
