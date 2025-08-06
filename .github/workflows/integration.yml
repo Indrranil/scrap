@@ -30,6 +30,7 @@ jobs:
         python -m pip install --upgrade pip
         pip install black isort flake8 mypy bandit pytest pytest-cov types-requests pandas-stubs
         pip install -r app/requirements.txt
+        pip install -r app/auto_tests/requirements-test.txt
         
     # - name: 🖤 Black formatter check
     #   run: |
@@ -93,7 +94,7 @@ jobs:
         
     - name: 🧪 Run automated tests
       run: |
-        echo "🧪 Running automated tests..."
+        echo "🧪 Running automated tests with new refactored test suite..."
         export PYTHONPATH=$(pwd)
         export TESTING=1
         export MYSQL_USER=dummy
@@ -105,11 +106,12 @@ jobs:
         export KEYCLOAK_CLIENT_ID=dummy
         export KEYCLOAK_CLIENT_SECRET=dummy
         export KEYCLOAK_REALM=dummy
-        pytest app/auto_tests/test_services.py -v 
+        echo "📋 Running all refactored tests using run_tests.py..."
+        python run_tests.py --verbose
         if [ $? -eq 0 ]; then
-          echo "🧪 Testing: All tests passed"
+          echo "✅ All refactored tests passed successfully!"
         else
-          echo "🧪 Testing: Some tests failed"
+          echo "❌ Some tests failed - check output above"
           exit 1
         fi
         

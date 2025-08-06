@@ -15,9 +15,9 @@ load_dotenv()
 
 # Initialize Keycloak Admin
 keycloak_admin = KeycloakAdmin(
-    server_url=str(getenv("KEYCLOAK_URL")),
-    username="admin",
-    password=str(getenv("KEYCLOAK_PASSWORD")),
+    server_url=getenv("KEYCLOAK_URL"),
+    username=getenv("KEYCLOAK_ADMIN"),
+    password=getenv("KEYCLOAK_ADMIN_PASSWORD"),
     realm_name="master",
     verify=True,
 )

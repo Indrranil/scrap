@@ -1,0 +1,41 @@
+# Test Dependencies for PolarisAI API Router Tests
+# Install with: pip install -r requirements-test.txt
+
+# Core testing framework
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+
+# FastAPI testing
+httpx>=0.24.0
+fastapi[all]>=0.100.0
+
+# Database testing with SQLite
+sqlalchemy>=2.0.0
+alembic>=1.11.0
+
+# Mocking and fixtures
+pytest-mock>=3.11.0
+pytest-fixtures>=0.1.0
+
+# Coverage reporting (optional)
+pytest-cov>=4.1.0
+
+# Additional testing utilities
+factory-boy>=3.3.0  # For creating test data
+faker>=19.0.0       # For generating fake data
+freezegun>=1.2.0    # For mocking datetime
+
+# Keycloak testing (for user management tests)
+python-keycloak>=3.7.0
+
+# File handling for upload tests
+python-multipart>=0.0.6
+
+# Environment management
+python-dotenv>=1.0.0
+
+# Pandas for CSV testing
+pandas>=2.0.0
+
+# Email validation
+email-validator>=2.0.0
