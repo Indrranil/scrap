@@ -1,34 +1,36 @@
-# IMPORTANT: Import test environment setup FIRST to set TESTING=1
 from app.auto_tests.test_env_setup import *
 
+import os
+import sys
 import tempfile
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.orm import Session, sessionmaker
 
 try:
-    from app.database.connection import get_db, Base
+    from app.database.connection import Base, get_db
     from app.main import app
-
-    # Import all models to ensure tables are created
     from app.models.application import Application
+    from app.models.application_container import ApplicationContainer
+    from app.models.application_status_log import ApplicationStatusLog
+    from app.models.general_property import GeneralProperty
+    from app.models.machine import Machine
     from app.models.pipeline import Pipeline
     from app.models.pipeline_input import PipelineInput
     from app.models.pipeline_session import PipelineSession
     from app.models.pipeline_session_output import PipelineSessionOutput
-    from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
-    from app.models.general_property import GeneralProperty
-    from app.models.machine import Machine
-    from app.models.application_container import ApplicationContainer
-    from app.models.application_status_log import ApplicationStatusLog
+    from app.models.pipeline_session_output_unit import (
+        PipelineSessionOutputUnit,
+    )
     from app.models.property_description import PropertyDescription
 except ImportError as e:
     print(f"Import error: {e}")
     print(f"Current working directory: {os.getcwd()}")
     print(f"Python path: {sys.path}")
     raise
+
 
 
 @pytest.fixture(scope="session")
