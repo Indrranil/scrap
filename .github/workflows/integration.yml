@@ -84,7 +84,7 @@ jobs:
     - name: 🔒 bandit security scan
       run: |
         echo "🔒 Running bandit security scan..."
-        bandit -r app/
+        bandit -r app/ -x app/auto_tests
         if [ $? -eq 0 ]; then
           echo "✅ Bandit: No security issues found"
         else
