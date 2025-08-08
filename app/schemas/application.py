@@ -5,7 +5,7 @@ class ApplicationBase(BaseModel):
     name: str
     is_usable: int = 1
 
-    @field_validator('name')
+    @field_validator("name")
     def validate_name(cls, v):
         if not v or not v.strip():
             raise ValueError("Value error, Name cannot be empty")

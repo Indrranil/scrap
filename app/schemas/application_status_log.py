@@ -1,13 +1,27 @@
-from pydantic import BaseModel
 from typing import Literal
 
-StatusTypes = Literal['start', 'starting', 'started', 'idle', 'running',
-                     'kill', 'killing', 'killed', 'stop', 'stopping',
-                     'stopped', 'error']
+from pydantic import BaseModel
+
+StatusTypes = Literal[
+    "start",
+    "starting",
+    "started",
+    "idle",
+    "running",
+    "kill",
+    "killing",
+    "killed",
+    "stop",
+    "stopping",
+    "stopped",
+    "error",
+]
+
 
 class ApplicationStatusLogCreate(BaseModel):
     application_container_id: str
     value: StatusTypes
+
 
 class ApplicationStatusLogResponse(ApplicationStatusLogCreate):
     id: int

@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, BigInteger, Enum
-from app.database.connection import Base
 import enum
+
+from sqlalchemy import BigInteger, Column, Enum, Integer, String
+
+from app.database.connection import Base
 
 
 class PropertyType(enum.Enum):
@@ -15,7 +17,7 @@ class GeneralProperty(Base):
 
     id = Column(Integer, primary_key=True, index=True, autoincrement=True)
     referrer_id = Column(Integer)
-    property_type = Column(Enum(PropertyType))
+    property_type = Column(Enum(PropertyType))  # type: ignore
     property_label = Column(String(255))
     property_key = Column(String(255))
     property_value = Column(String(255))

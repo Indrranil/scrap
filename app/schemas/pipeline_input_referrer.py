@@ -1,5 +1,6 @@
 from pydantic import BaseModel
 
+
 class PipelineInputReferrerBase(BaseModel):
     key: str
     value: str
@@ -10,6 +11,6 @@ class PipelineInputReferrerBase(BaseModel):
 class PipelineInputReferrerResponse(PipelineInputReferrerBase):
     id: int
     created_at: int
-    
+
     class Config:
         from_attributes = True

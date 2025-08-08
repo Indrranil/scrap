@@ -1,15 +1,16 @@
 # schemas/pipeline_session_output_unit.py
-from pydantic import BaseModel, ConfigDict
-from typing import Optional, List
 from enum import Enum
+from typing import List, Optional
+
+from pydantic import BaseModel, ConfigDict
 
 
 class UnitStatus(str, Enum):
-    IDLE = 'idle'
-    READY = 'ready'
-    ANALYSING = 'analysing'
-    SUCCESS = 'success'
-    ERROR = 'error'
+    IDLE = "idle"
+    READY = "ready"
+    ANALYSING = "analysing"
+    SUCCESS = "success"
+    ERROR = "error"
 
 
 class PipelineSessionOutputUnitBase(BaseModel):

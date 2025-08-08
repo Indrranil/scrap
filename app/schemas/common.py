@@ -1,6 +1,8 @@
 # schemas/common.py
-from pydantic import BaseModel
 from typing import List
+
+from pydantic import BaseModel
+
 
 class PropertyItem(BaseModel):
     id: int
@@ -9,11 +11,13 @@ class PropertyItem(BaseModel):
     property_value: str
     created_at: int
 
+
 class GenericItemResponse(BaseModel):
     id: int
     name: str
     created_at: int
     properties: List[PropertyItem]
+
 
 class GenericListResponse(BaseModel):
     total: int

@@ -1,30 +1,40 @@
 import time
-from typing import Optional, List
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from starlette import status
 
 from app.auth.auth import require_roles
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
-from app.models.pipeline_session_output import PipelineSessionOutput as PipelineSessionOutputModel
+from app.models.pipeline_session_output import (
+    PipelineSessionOutput as PipelineSessionOutputModel,
+)
 from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
-from app.schemas.pipeline_session_output import PipelineSessionOutputCreate, PipelineSessionOutput
+from app.schemas.pipeline_session_output import (
+    PipelineSessionOutput,
+    PipelineSessionOutputCreate,
+)
 
-router = APIRouter(prefix="/v1/pipeline-session-output", tags=["pipeline-session-output"])
+router = APIRouter(
+    prefix="/v1/pipeline-session-output", tags=["pipeline-session-output"]
+)
 
 
 @router.post("/new", response_model=PipelineSessionOutput, status_code=201)
 async def create_pipeline_session_output(
-        pipeline_session_output: PipelineSessionOutputCreate,
-        manual: Optional[int] = Query(0),
-        property_key: Optional[str] = Query(None, alias="property-key"),
-        db: Session = Depends(get_db),
-        _: bool = Depends(require_roles(["app_admin", "app_user"]))
+    pipeline_session_output: PipelineSessionOutputCreate,
+    manual: Optional[int] = Query(0),
+    property_key: Optional[str] = Query(None, alias="property-key"),
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     if manual and pipeline_session_output.pipeline_session_output_unit:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Either manual mode or pipeline session output unit should be used")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Either manual mode or pipeline session output unit should be used",
+        )
     try:
         db.begin()
 
@@ -36,18 +46,20 @@ async def create_pipeline_session_output(
             name=pipeline_session_output.name,
             created_at=timestamp,
             ended_at=pipeline_session_output.ended_at,
-            is_usable=1
+            is_usable=1,
         )
 
         db.add(new_output)
         db.flush()  # Flush to get the new output ID
 
         if pipeline_session_output.pipeline_session_output_unit:
-            pipeline_session_output.pipeline_session_output_unit.pipeline_session_output_id = new_output.id
+            # Flush to ensure new_output.id is available
+            db.flush()
+            pipeline_session_output.pipeline_session_output_unit.pipeline_session_output_id = new_output.id  # type: ignore
             # Create pipeline session output unit
             new_output_unit = PipelineSessionOutputUnit(
                 **pipeline_session_output.pipeline_session_output_unit.model_dump(),
-                created_at=timestamp
+                created_at=timestamp,
             )
 
             db.add(new_output_unit)
@@ -55,13 +67,11 @@ async def create_pipeline_session_output(
         # If manual mode, create output units
         if manual:
             # Get relevant properties query
-            query = db.query(GeneralProperty).filter(
-                GeneralProperty.is_usable == 1
-            )
+            query = db.query(GeneralProperty).filter(GeneralProperty.is_usable == 1)
 
             # Apply property key filter if provided
             if property_key:
-                property_keys = [key.strip() for key in property_key.split(',')]
+                property_keys = [key.strip() for key in property_key.split(",")]
                 query = query.filter(GeneralProperty.property_key.in_(property_keys))
 
             properties: List[GeneralProperty] = query.all()
@@ -74,9 +84,9 @@ async def create_pipeline_session_output(
                     output_key=prop.property_key,
                     name=prop.property_label,
                     output_value=None,
-                    status='idle',
+                    status="idle",
                     created_at=timestamp,
-                    is_usable=1
+                    is_usable=1,
                 )
                 db.add(output_unit)
 
@@ -88,21 +98,22 @@ async def create_pipeline_session_output(
     except Exception as e:
         db.rollback()
         raise HTTPException(
-            status_code=500,
-            detail=f"Error creating pipeline session output: {str(e)}"
+            status_code=500, detail=f"Error creating pipeline session output: {str(e)}"
         )
 
 
 @router.get("/all")
 async def get_all_pipeline_session_outputs(
-        overview: int = Query(1),
-        db: Session = Depends(get_db),
-        _: bool = Depends(require_roles(["app_admin", "app_user"]))
+    overview: int = Query(1),
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     try:
-        outputs = db.query(PipelineSessionOutputModel).filter(
-            PipelineSessionOutputModel.is_usable == 1
-        ).all()
+        outputs = (
+            db.query(PipelineSessionOutputModel)
+            .filter(PipelineSessionOutputModel.is_usable == 1)
+            .all()
+        )
 
         # If overview=1, return just the outputs list
         if overview == 1:
@@ -111,44 +122,51 @@ async def get_all_pipeline_session_outputs(
         # If overview=0, include related output units for each output
         result = []
         for output in outputs:
-            output_dict = vars(output)
+            output_dict = dict(vars(output))
 
             # Get related output units
-            units = db.query(PipelineSessionOutputUnit).filter(
-                PipelineSessionOutputUnit.pipeline_session_output_id == output.id,
-                PipelineSessionOutputUnit.is_usable == 1
-            ).all()
+            units = (
+                db.query(PipelineSessionOutputUnit)
+                .filter(
+                    PipelineSessionOutputUnit.pipeline_session_output_id == output.id,
+                    PipelineSessionOutputUnit.is_usable == 1,
+                )
+                .all()
+            )
 
-            output_dict['units'] = [vars(unit) for unit in units]
+            output_dict["units"] = [vars(unit) for unit in units]
             result.append(output_dict)
 
         return result
 
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching pipeline session outputs: {str(e)}"
+            status_code=500, detail=f"Error fetching pipeline session outputs: {str(e)}"
         )
 
 
 @router.get("/{output_id}")
 async def get_pipeline_session_output(
-        output_id: int,
-        overview: int = Query(1),
-        db: Session = Depends(get_db),
-        _: bool = Depends(require_roles(["app_admin", "app_user"]))
+    output_id: int,
+    overview: int = Query(1),
+    db: Session = Depends(get_db),
+    _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     try:
         # Get base output data
-        output = db.query(PipelineSessionOutputModel).filter(
-            PipelineSessionOutputModel.id == output_id,
-            PipelineSessionOutputModel.is_usable == 1
-        ).first()
+        output = (
+            db.query(PipelineSessionOutputModel)
+            .filter(
+                PipelineSessionOutputModel.id == output_id,
+                PipelineSessionOutputModel.is_usable == 1,
+            )
+            .first()
+        )
 
         if not output:
             raise HTTPException(
                 status_code=404,
-                detail=f"Pipeline session output with ID {output_id} not found"
+                detail=f"Pipeline session output with ID {output_id} not found",
             )
 
         # If overview=1, return just the output data
@@ -156,15 +174,19 @@ async def get_pipeline_session_output(
             return output
 
         # If overview=0, include related output units
-        output_dict = vars(output)
+        output_dict = dict(vars(output))
 
         # Get related output units
-        units = db.query(PipelineSessionOutputUnit).filter(
-            PipelineSessionOutputUnit.pipeline_session_output_id == output_id,
-            PipelineSessionOutputUnit.is_usable == 1
-        ).all()
+        units = (
+            db.query(PipelineSessionOutputUnit)
+            .filter(
+                PipelineSessionOutputUnit.pipeline_session_output_id == output_id,
+                PipelineSessionOutputUnit.is_usable == 1,
+            )
+            .all()
+        )
 
-        output_dict['units'] = [vars(unit) for unit in units]
+        output_dict["units"] = [dict(vars(unit)) for unit in units]
 
         return output_dict
 
@@ -172,6 +194,5 @@ async def get_pipeline_session_output(
         raise he
     except Exception as e:
         raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching pipeline session output: {str(e)}"
+            status_code=500, detail=f"Error fetching pipeline session output: {str(e)}"
         )

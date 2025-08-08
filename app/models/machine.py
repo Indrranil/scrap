@@ -1,6 +1,8 @@
-from sqlalchemy import Column, Integer, String, Enum, BigInteger
-from app.database.connection import Base
 import enum
+
+from sqlalchemy import BigInteger, Column, Enum, Integer, String
+
+from app.database.connection import Base
 
 
 class MachineType(str, enum.Enum):
