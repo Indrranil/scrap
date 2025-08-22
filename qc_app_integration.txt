@@ -1,13 +1,16 @@
 1) CLD Barcode Analysis:
-   > Create a pipeline session with a fixed `pipeline_input_id`
+   > Create a pipeline session with a fixed `pipeline_input_id` (cld barcode)
    > Create a manual pipeline session output
+   > Switch the status of pipeline session output unit to "ready"
    > Keep checking the units for the `detected_value`
    > Once the detected value is added, make a request to get `/general-property/all`
      with property_type=pipeline-input, property_key=cld, property_value=<detected_value> 
    > Returning general property's "referrer_id" is the "pipeline_input_id" (variant_id)
 
 2) New QC Session:
-   > Use the `pipeline_input_id` from the cld analysis to create a new session
-   > Create a manual pipeline session output
+   > Use the `pipeline_input_id` from the cld analysis to create a new pipeline session
+   > Create a manual pipeline session output (depends on number of units selected, create 5 pipeline session output if there are 5 units)
    > Any other meta info related to qc session, create a general property using 
      key-value pair
+
+> Rest of things related to sessions follow the same logic
