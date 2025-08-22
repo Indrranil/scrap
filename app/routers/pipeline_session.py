@@ -1,6 +1,3 @@
-import time
-from typing import List
-
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
 
@@ -106,7 +103,7 @@ async def get_all_pipeline_sessions(
 
             sessions_arr[index]["outputs"] = outputs_list  # type: ignore
 
-        return {"total": len(sessions), "data": sessions}
+        return {"total": len(sessions), "data": sessions_arr}
     except Exception as e:
         print(f"Error: {str(e)}")
         raise HTTPException(
