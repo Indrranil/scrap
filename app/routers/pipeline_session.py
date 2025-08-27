@@ -1,21 +1,20 @@
+import time
+from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-
 from app.auth.auth import require_roles
 from app.database.connection import get_db
 from app.models.pipeline_session import PipelineSession as PipelineSessionModel
 from app.models.pipeline_session_output import PipelineSessionOutput
 from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
+from app.models.general_property import GeneralProperty
 from app.schemas.pipeline_session import (
     BasicFilter,
     PipelineSession,
     PipelineSessionCreate,
 )
 from app.services.pipeline_session import pipeline_session_service
-
 router = APIRouter(prefix="/v1/pipeline-session", tags=["pipeline-session"])
-
-
 @router.post("/new", response_model=PipelineSession, status_code=201)
 async def create_pipeline_session(
     request: Request,
@@ -28,8 +27,6 @@ async def create_pipeline_session(
     return pipeline_session_service.create_with_user(
         db, obj_in=pipeline_session, user_id=user_id
     )
-
-
 @router.get("/all")
 async def get_all_pipeline_sessions(
     overview: int = Query(1, required=False),
@@ -43,7 +40,6 @@ async def get_all_pipeline_sessions(
             sort = PipelineSessionModel.id.asc()
         else:
             sort = PipelineSessionModel.id.desc()
-
         base_query = (
             db.query(PipelineSessionModel).filter(PipelineSessionModel.is_usable == 1)
             if pipeline_id is None
@@ -52,25 +48,68 @@ async def get_all_pipeline_sessions(
                 PipelineSessionModel.pipeline_id == pipeline_id,
             )
         )
-
         if filters.limit > 0:
             sessions = base_query.order_by(sort).limit(filters.limit).all()
         else:
             sessions = base_query.order_by(sort).all()
-
-        # If overview=1, return just the session data
+        # If overview=1, return just the session data with general properties
         if overview == 1:
-            return {"total": len(sessions), "data": sessions}
-
+            sessions_with_properties = []
+            for session in sessions:
+                session_dict = dict(vars(session))
+                # Get general properties for this pipeline session
+                general_properties = (
+                    db.query(GeneralProperty)
+                    .filter(
+                        GeneralProperty.referrer_id == session.id,
+                        GeneralProperty.property_type == "pipeline",
+                        GeneralProperty.is_usable == 1,
+                    )
+                    .all()
+                )
+                # Add general properties to session data
+                session_dict["general_properties"] = [
+                    {
+                        "id": prop.id,
+                        "property_label": prop.property_label,
+                        "property_key": prop.property_key,
+                        "property_value": prop.property_value,
+                        "tags": prop.tags,
+                        "created_at": prop.created_at,
+                    }
+                    for prop in general_properties
+                ]
+                sessions_with_properties.append(session_dict)
+            return {"total": len(sessions), "data": sessions_with_properties}
         # If overview=0, include related outputs and units
         sessions_arr = [dict(vars(session)) for session in sessions]
-
         if filters.last_index is None or filters.last_index <= 0:
             condition = PipelineSessionOutput.id > 0
         else:
             condition = PipelineSessionOutput.id < filters.last_index
-
         for index, session in enumerate(sessions):
+            # Get general properties for this pipeline session
+            general_properties = (
+                db.query(GeneralProperty)
+                .filter(
+                    GeneralProperty.referrer_id == session.id,
+                    GeneralProperty.property_type == "pipeline",
+                    GeneralProperty.is_usable == 1,
+                )
+                .all()
+            )
+            # Add general properties to session data
+            sessions_arr[index]["general_properties"] = [
+                {
+                    "id": prop.id,
+                    "property_label": prop.property_label,
+                    "property_key": prop.property_key,
+                    "property_value": prop.property_value,
+                    "tags": prop.tags,
+                    "created_at": prop.created_at,
+                }
+                for prop in general_properties
+            ]
             # Get related outputs with eager loading
             outputs = (
                 db.query(PipelineSessionOutput)
@@ -83,7 +122,6 @@ async def get_all_pipeline_sessions(
                 .limit(15)
                 .all()
             )
-
             outputs_list = []
             for output in outputs:
                 output_dict = dict(vars(output))
@@ -97,20 +135,15 @@ async def get_all_pipeline_sessions(
                     )
                     .all()
                 )
-
                 output_dict["units"] = [dict(vars(unit)) for unit in units]
                 outputs_list.append(output_dict)
-
             sessions_arr[index]["outputs"] = outputs_list  # type: ignore
-
-        return {"total": len(sessions), "data": sessions_arr}
+        return {"total": len(sessions), "data": sessions}
     except Exception as e:
         print(f"Error: {str(e)}")
         raise HTTPException(
             status_code=500, detail=f"Error fetching pipeline sessions: {str(e)}"
         )
-
-
 @router.get("/{session_id}")
 async def get_pipeline_session(
     session_id: int,
@@ -128,20 +161,61 @@ async def get_pipeline_session(
             )
             .first()
         )
-
         if not session:
             raise HTTPException(
                 status_code=404,
                 detail=f"Pipeline session with ID {session_id} not found",
             )
-
-        # If overview=1, return just the session data
+        # If overview=1, return just the session data with general properties
         if overview == 1:
-            return session
-
+            session_dict = dict(vars(session))
+            # Get general properties for this pipeline session
+            general_properties = (
+                db.query(GeneralProperty)
+                .filter(
+                    GeneralProperty.referrer_id == session_id,
+                    GeneralProperty.property_type == "pipeline",
+                    GeneralProperty.is_usable == 1,
+                )
+                .all()
+            )
+            # Add general properties to session data
+            session_dict["general_properties"] = [
+                {
+                    "id": prop.id,
+                    "property_label": prop.property_label,
+                    "property_key": prop.property_key,
+                    "property_value": prop.property_value,
+                    "tags": prop.tags,
+                    "created_at": prop.created_at,
+                }
+                for prop in general_properties
+            ]
+            return session_dict
         # If overview=0, include related outputs and units
         session_dict = dict(vars(session))
-
+        # Get general properties for this pipeline session
+        general_properties = (
+            db.query(GeneralProperty)
+            .filter(
+                GeneralProperty.referrer_id == session_id,
+                GeneralProperty.property_type == "pipeline",
+                GeneralProperty.is_usable == 1,
+            )
+            .all()
+        )
+        # Add general properties to session data
+        session_dict["general_properties"] = [
+            {
+                "id": prop.id,
+                "property_label": prop.property_label,
+                "property_key": prop.property_key,
+                "property_value": prop.property_value,
+                "tags": prop.tags,
+                "created_at": prop.created_at,
+            }
+            for prop in general_properties
+        ]
         # Get related outputs with eager loading
         outputs = (
             db.query(PipelineSessionOutput)
@@ -151,7 +225,6 @@ async def get_pipeline_session(
             )
             .all()
         )
-
         outputs_list = []
         for output in outputs:
             output_dict = dict(vars(output))
@@ -164,14 +237,10 @@ async def get_pipeline_session(
                 )
                 .all()
             )
-
             output_dict["units"] = [dict(vars(unit)) for unit in units]
             outputs_list.append(output_dict)
-
         session_dict["outputs"] = outputs_list  # type: ignore
-
         return session_dict
-
     except HTTPException as he:
         raise he
     except Exception as e:
