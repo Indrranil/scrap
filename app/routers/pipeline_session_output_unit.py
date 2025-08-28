@@ -86,9 +86,9 @@ async def get_all_pipeline_session_output_units(
         if filters.limit <= 0:
             units = units.limit(15)
 
-        units = units.all()
+        units_list = units.all()
 
-        response_payload = {"total": len(units), "items": [vars(unit) for unit in units]}
+        response_payload = {"total": len(units_list), "items": [vars(unit) for unit in units_list]}
         return response_payload
 
     except Exception as e:
