@@ -72,7 +72,7 @@ async def create_pipeline_session_output(
             pipeline_session = db.query(PipelineSession).filter(
                 PipelineSession.id == pipeline_session_output.pipeline_session_id
             ).first()
-            
+
             if not pipeline_session:
                 raise HTTPException(
                     status_code=404,
@@ -199,7 +199,7 @@ async def get_all_pipeline_session_outputs(
 @router.get("/{output_id}")
 async def get_pipeline_session_output(
     output_id: int,
-   
+
     overview: int = Query(1),
     db: Session = Depends(get_db),
     _: bool = Depends(require_roles(["app_admin", "app_user"])),
