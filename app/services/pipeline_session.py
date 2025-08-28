@@ -44,11 +44,13 @@ class PipelineSessionService(
 
             return db_obj
 
-        except SQLAlchemyError:
+        except SQLAlchemyError as e:
             db.rollback()
+            print(e)
             raise HTTPException(status_code=500, detail="Database error occurred")
-        except Exception:
+        except Exception as e:
             db.rollback()
+            print(e)
             raise HTTPException(status_code=500, detail="An unexpected error occurred")
 
 
