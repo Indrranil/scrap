@@ -2,18 +2,18 @@ import time
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy.orm import Session
 from sqlalchemy import func
+from sqlalchemy.orm import Session
 from starlette import status
 
 from app.auth.auth import require_roles
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
+from app.models.pipeline_session import PipelineSession
 from app.models.pipeline_session_output import (
     PipelineSessionOutput as PipelineSessionOutputModel,
 )
 from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
-from app.models.pipeline_session import PipelineSession
 from app.schemas.pipeline_session_output import (
     PipelineSessionOutput,
     PipelineSessionOutputCreate,
