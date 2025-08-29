@@ -139,7 +139,37 @@ async def get_all_pipeline_sessions(
                     )
                     .all()
                 )
-                output_dict["units"] = [dict(vars(unit)) for unit in units]
+
+                # Enhance units with property reference data
+                enhanced_units = []
+                for unit in units:
+                    unit_dict = dict(vars(unit))
+
+                    # Get the referenced general property if property_reference_id exists
+                    if unit.property_reference_id:
+                        property_ref = (
+                            db.query(GeneralProperty)
+                            .filter(GeneralProperty.id == unit.property_reference_id)
+                            .first()
+                        )
+
+                        if property_ref:
+                            unit_dict["property_reference"] = {
+                                "id": property_ref.id,
+                                "property_label": property_ref.property_label,
+                                "property_key": property_ref.property_key,
+                                "property_value": property_ref.property_value,
+                                "tags": property_ref.tags,
+                                "created_at": property_ref.created_at,
+                            }
+                        else:
+                            unit_dict["property_reference"] = None
+                    else:
+                        unit_dict["property_reference"] = None
+
+                    enhanced_units.append(unit_dict)
+
+                output_dict["units"] = enhanced_units
                 outputs_list.append(output_dict)
             sessions_arr[index]["outputs"] = outputs_list  # type: ignore
         return {"total": len(sessions), "data": sessions_arr}
@@ -243,7 +273,37 @@ async def get_pipeline_session(
                 )
                 .all()
             )
-            output_dict["units"] = [dict(vars(unit)) for unit in units]
+
+            # Enhance units with property reference data
+            enhanced_units = []
+            for unit in units:
+                unit_dict = dict(vars(unit))
+
+                # Get the referenced general property if property_reference_id exists
+                if unit.property_reference_id:
+                    property_ref = (
+                        db.query(GeneralProperty)
+                        .filter(GeneralProperty.id == unit.property_reference_id)
+                        .first()
+                    )
+
+                    if property_ref:
+                        unit_dict["property_reference"] = {
+                            "id": property_ref.id,
+                            "property_label": property_ref.property_label,
+                            "property_key": property_ref.property_key,
+                            "property_value": property_ref.property_value,
+                            "tags": property_ref.tags,
+                            "created_at": property_ref.created_at,
+                        }
+                    else:
+                        unit_dict["property_reference"] = None
+                else:
+                    unit_dict["property_reference"] = None
+
+                enhanced_units.append(unit_dict)
+
+            output_dict["units"] = enhanced_units
             outputs_list.append(output_dict)
         session_dict["outputs"] = outputs_list  # type: ignore
         return session_dict

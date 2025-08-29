@@ -55,6 +55,7 @@ async def get_all_properties(
                 "description": f"Property for {prop.property_label}",
                 "property_label": prop.property_label,
                 "property_key": prop.property_key,
+                "property_value": prop.property_value,
                 "property_value_type": "string",
                 "created_at": prop.created_at,
             }
