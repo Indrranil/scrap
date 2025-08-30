@@ -66,7 +66,7 @@ async def get_all_pipeline_sessions(
                     db.query(GeneralProperty)
                     .filter(
                         GeneralProperty.referrer_id == session.id,
-                        GeneralProperty.property_type == "pipeline",
+                        GeneralProperty.property_type == "pipeline_session",
                         GeneralProperty.is_usable == 1,
                     )
                     .all()
@@ -210,7 +210,7 @@ async def get_pipeline_session(
                 db.query(GeneralProperty)
                 .filter(
                     GeneralProperty.referrer_id == session_id,
-                    GeneralProperty.property_type == "pipeline",
+                    GeneralProperty.property_type == "pipeline_session",
                     GeneralProperty.is_usable == 1,
                 )
                 .all()
@@ -235,7 +235,7 @@ async def get_pipeline_session(
             db.query(GeneralProperty)
             .filter(
                 GeneralProperty.referrer_id == session_id,
-                GeneralProperty.property_type == "pipeline",
+                GeneralProperty.property_type == "pipeline_session",
                 GeneralProperty.is_usable == 1,
             )
             .all()
