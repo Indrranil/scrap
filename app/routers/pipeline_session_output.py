@@ -29,6 +29,7 @@ async def create_pipeline_session_output(
     pipeline_session_output: PipelineSessionOutputCreate,
     manual: Optional[int] = Query(0),
     property_key: Optional[str] = Query(None, alias="property-key"),
+    property_type: Optional[str] = Query(None, alias="property-type"),
     db: Session = Depends(get_db),
     _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
@@ -90,7 +91,7 @@ async def create_pipeline_session_output(
                 )
                 .filter(
                     GeneralProperty.referrer_id == pipeline_session.pipeline_input_id,
-                    GeneralProperty.property_type == "pipeline_input",
+                    GeneralProperty.property_type == (property_type if property_type else "pipeline_input"),
                     GeneralProperty.is_usable == 1
                 )
                 .group_by(
@@ -113,7 +114,7 @@ async def create_pipeline_session_output(
                 )
                 .filter(
                     GeneralProperty.referrer_id == pipeline_session.pipeline_input_id,
-                    GeneralProperty.property_type == "pipeline_input",
+                    GeneralProperty.property_type == (property_type if property_type else "pipeline_input"),
                     GeneralProperty.is_usable == 1
                 )
             )
