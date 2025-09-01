@@ -20,21 +20,28 @@ async def get_all_properties(
     property_type: Optional[str] = "%",
     property_key: Optional[str] = "%",
     property_value: Optional[str] = "%",
+    referrer_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     try:
+        # Build base query with filters
+        base_filters = [
+            GeneralProperty.property_key.like(property_key),
+            GeneralProperty.property_type.like(property_type),
+            GeneralProperty.property_value.like(property_value),
+            GeneralProperty.is_usable == 1,
+        ]
+
+        # Add referrer_id filter if provided
+        if referrer_id is not None:
+            base_filters.append(GeneralProperty.referrer_id == referrer_id)
 
         properties_subquery = (
             db.query(
                 GeneralProperty.property_label,
                 func.min(GeneralProperty.id).label("min_id"),
             )
-            .filter(
-                GeneralProperty.property_key.like(property_key),
-                GeneralProperty.property_type.like(property_type),
-                GeneralProperty.property_value.like(property_value),
-                GeneralProperty.is_usable == 1,
-            )
+            .filter(*base_filters)
             .group_by(GeneralProperty.property_label)
             .subquery()
         )

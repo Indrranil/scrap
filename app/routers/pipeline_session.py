@@ -35,6 +35,7 @@ async def create_pipeline_session(
 async def get_all_pipeline_sessions(
         overview: int = Query(1, required=False),
         pipeline_id: int = Query(None, required=False),
+        name: str = Query(None, required=False),
         filters: BasicFilter = Depends(),
         db: Session = Depends(get_db),
         _: bool = Depends(require_roles(["app_admin", "app_user"])),
@@ -44,14 +45,16 @@ async def get_all_pipeline_sessions(
             sort = PipelineSessionModel.id.asc()
         else:
             sort = PipelineSessionModel.id.desc()
-        base_query = (
-            db.query(PipelineSessionModel).filter(PipelineSessionModel.is_usable == 1)
-            if pipeline_id is None
-            else db.query(PipelineSessionModel).filter(
-                PipelineSessionModel.is_usable == 1,
-                PipelineSessionModel.pipeline_id == pipeline_id,
-            )
-        )
+        # Build base query with filters
+        base_query = db.query(PipelineSessionModel).filter(PipelineSessionModel.is_usable == 1)
+
+        # Add pipeline_id filter if provided
+        if pipeline_id is not None:
+            base_query = base_query.filter(PipelineSessionModel.pipeline_id == pipeline_id)
+
+        # Add name filter if provided
+        if name is not None:
+            base_query = base_query.filter(PipelineSessionModel.name == name)
         if filters.limit > 0:
             sessions = base_query.order_by(sort).limit(filters.limit).all()
         else:
