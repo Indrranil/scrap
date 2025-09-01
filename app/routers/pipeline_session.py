@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from app.auth.auth import require_roles
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
+from app.models.pipeline_input import PipelineInput
 from app.models.pipeline_session import PipelineSession as PipelineSessionModel
 from app.models.pipeline_session_output import PipelineSessionOutput
 from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
@@ -110,30 +111,23 @@ async def get_all_pipeline_sessions(
                     for prop in general_properties
                 ]
 
-                # Get pipeline input properties if pipeline_input_id exists
+                # Get pipeline input row if pipeline_input_id exists
                 if session.pipeline_input_id:
-                    pipeline_input_properties = (
-                        db.query(GeneralProperty)
-                        .filter(
-                            GeneralProperty.referrer_id == session.pipeline_input_id,
-                            GeneralProperty.property_type == "pipeline_input",
-                            GeneralProperty.is_usable == 1,
-                        )
-                        .all()
-                    )
-                    session_dict["pipeline_input_properties"] = [
-                        {
-                            "id": prop.id,
-                            "property_label": prop.property_label,
-                            "property_key": prop.property_key,
-                            "property_value": prop.property_value,
-                            "tags": prop.tags,
-                            "created_at": prop.created_at,
+                    pipeline_input = db.query(PipelineInput).filter(
+                        PipelineInput.id == session.pipeline_input_id,
+                        PipelineInput.is_usable == 1
+                    ).first()
+                    if pipeline_input:
+                        session_dict["pipeline_input"] = {
+                            "id": pipeline_input.id,
+                            "name": pipeline_input.name,
+                            "created_at": pipeline_input.created_at,
+                            "is_usable": pipeline_input.is_usable
                         }
-                        for prop in pipeline_input_properties
-                    ]
+                    else:
+                        session_dict["pipeline_input"] = None
                 else:
-                    session_dict["pipeline_input_properties"] = []
+                    session_dict["pipeline_input"] = None
                 sessions_with_properties.append(session_dict)
             return {"total": len(sessions), "data": sessions_with_properties}
         # If overview=0, include related outputs and units
@@ -166,30 +160,23 @@ async def get_all_pipeline_sessions(
                 for prop in general_properties
             ]
 
-            # Get pipeline input properties if pipeline_input_id exists
+            # Get pipeline input row if pipeline_input_id exists
             if session.pipeline_input_id:
-                pipeline_input_properties = (
-                    db.query(GeneralProperty)
-                    .filter(
-                        GeneralProperty.referrer_id == session.pipeline_input_id,
-                        GeneralProperty.property_type == "pipeline_input",
-                        GeneralProperty.is_usable == 1,
-                    )
-                    .all()
-                )
-                sessions_arr[index]["pipeline_input_properties"] = [
-                    {
-                        "id": prop.id,
-                        "property_label": prop.property_label,
-                        "property_key": prop.property_key,
-                        "property_value": prop.property_value,
-                        "tags": prop.tags,
-                        "created_at": prop.created_at,
+                pipeline_input = db.query(PipelineInput).filter(
+                    PipelineInput.id == session.pipeline_input_id,
+                    PipelineInput.is_usable == 1
+                ).first()
+                if pipeline_input:
+                    sessions_arr[index]["pipeline_input"] = {
+                        "id": pipeline_input.id,
+                        "name": pipeline_input.name,
+                        "created_at": pipeline_input.created_at,
+                        "is_usable": pipeline_input.is_usable
                     }
-                    for prop in pipeline_input_properties
-                ]
+                else:
+                    sessions_arr[index]["pipeline_input"] = None
             else:
-                sessions_arr[index]["pipeline_input_properties"] = []
+                sessions_arr[index]["pipeline_input"] = None
             # Get related outputs with eager loading
             outputs = (
                 db.query(PipelineSessionOutput)
@@ -303,6 +290,23 @@ async def get_pipeline_session(
                 }
                 for prop in general_properties
             ]
+            # Add pipeline input row if pipeline_input_id exists
+            if session.pipeline_input_id:
+                pipeline_input = db.query(PipelineInput).filter(
+                    PipelineInput.id == session.pipeline_input_id,
+                    PipelineInput.is_usable == 1
+                ).first()
+                if pipeline_input:
+                    session_dict["pipeline_input"] = {
+                        "id": pipeline_input.id,
+                        "name": pipeline_input.name,
+                        "created_at": pipeline_input.created_at,
+                        "is_usable": pipeline_input.is_usable
+                    }
+                else:
+                    session_dict["pipeline_input"] = None
+            else:
+                session_dict["pipeline_input"] = None
             return session_dict
         # If overview=0, include related outputs and units
         session_dict = dict(vars(session))
