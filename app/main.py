@@ -21,6 +21,7 @@ from app.routers.pipeline_session_output_unit import (
     router as pipeline_session_output_unit_router,
 )
 from app.routers.product import router as product_router
+from app.routers.product_admin import router as product_admin_router
 from app.routers.signin import router as signin_router
 from app.routers.users import router as user_router
 from app.routers.ws_router import broadcast_controller, output_stream_router
@@ -49,6 +50,7 @@ app.include_router(pipeline_session_router)
 app.include_router(pipeline_session_output_router)
 app.include_router(pipeline_session_output_unit_router)
 app.include_router(product_router)
+app.include_router(product_admin_router)
 app.include_router(property_router)
 app.include_router(signin_router)
 app.include_router(user_router)
