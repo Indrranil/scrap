@@ -289,10 +289,10 @@ async def create_bulk_product_upload(
         # Handle unnamed columns by using first non-empty row as headers
         if all(col.startswith("Unnamed:") for col in df.columns):
             # Find the first non-empty row to use as headers
-            header_row_index = 0
+            header_row_index: int = 0
             for i, row in df.iterrows():
                 if not all(pd.isna(val) or str(val).strip() == "" for val in row):
-                    header_row_index = i
+                    header_row_index = int(i)
                     break
 
             headers = df.iloc[header_row_index].tolist()
@@ -350,7 +350,7 @@ async def create_bulk_product_upload(
 
             except Exception as e:
                 failed_items.append({
-                    "row": index + 2,  # +2 because index starts at 0 and we skip header
+                    "row": int(index) + 2,  # +2 because index starts at 0 and we skip header
                     "variant_name": row.get("Variant Name", "Unknown"),
                     "error": str(e),
                 })
