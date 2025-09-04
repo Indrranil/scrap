@@ -292,7 +292,7 @@ async def create_bulk_product_upload(
             header_row_index: int = 0
             for i, row in df.iterrows():
                 if not all(pd.isna(val) or str(val).strip() == "" for val in row):
-                    header_row_index = int(i)
+                    header_row_index = i  # type: ignore
                     break
 
             headers = df.iloc[header_row_index].tolist()
@@ -350,7 +350,7 @@ async def create_bulk_product_upload(
 
             except Exception as e:
                 failed_items.append({
-                    "row": int(index) + 2,  # +2 because index starts at 0 and we skip header
+                    "row": index + 2,  # type: ignore  # +2 because index starts at 0 and we skip header
                     "variant_name": row.get("Variant Name", "Unknown"),
                     "error": str(e),
                 })
