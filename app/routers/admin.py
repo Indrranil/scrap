@@ -1,6 +1,6 @@
 import time
 from io import StringIO
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -13,9 +13,9 @@ from app.models.pipeline_input import PipelineInput
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
 # Hardcoded mapping for column_name to property_key
-COLUMN_PROPERTY_MAPPING = {
+COLUMN_PROPERTY_MAPPING: Dict[str, str] = {
     "Machine Code-Front": "front",
-    "Machine Code-Back": "back", 
+    "Machine Code-Back": "back",
     "Material Code-Front": "material_front",
     "Material Code-Back": "material_back",
     "Factory Code": "factory_code",
@@ -30,7 +30,7 @@ COLUMN_PROPERTY_MAPPING = {
     "Variant Barcode": "variant_barcode",
     "CLD Barcode": "cld_barcode",
     "Front Face": "front_face",
-    "Back Face": "back_face", 
+    "Back Face": "back_face",
     "Left Face": "left_face",
     "Right Face": "right_face",
     "Top Face": "top_face",
@@ -42,10 +42,10 @@ COLUMN_PROPERTY_MAPPING = {
 }
 
 # Pipeline Input core fields that go directly to PipelineInput table
-PIPELINE_INPUT_FIELDS = {"Variant Name"}
+PIPELINE_INPUT_FIELDS: set[str] = {"Variant Name"}
 
 # Form field configurations for different form types
-FORM_CONFIGURATIONS = {
+FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
     "product": {
         "name": "Product Form",
         "description": "Form for creating/editing product variants",
@@ -128,10 +128,10 @@ FORM_CONFIGURATIONS = {
 def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> PipelineInput:
     """Create or get existing PipelineInput from data"""
     variant_name = data.get("Variant Name", "").lower()
-    
+
     if not variant_name:
         raise ValueError("Variant Name is required")
-    
+
     # Check if pipeline input already exists
     pipeline_input = (
         db.query(PipelineInput)
@@ -141,7 +141,7 @@ def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> Pipeli
         )
         .first()
     )
-    
+
     if not pipeline_input:
         pipeline_input = PipelineInput(
             name=variant_name,
@@ -150,27 +150,27 @@ def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> Pipeli
         )
         db.add(pipeline_input)
         db.flush()
-    
+
     return pipeline_input
 
 
 def create_general_properties_from_data(
-    data: Dict[str, Any], 
-    pipeline_input: PipelineInput, 
+    data: Dict[str, Any],
+    pipeline_input: PipelineInput,
     db: Session
-) -> list:
+) -> List[Dict[str, Any]]:
     """Create GeneralProperty records from remaining data fields"""
-    properties_list = []
+    properties_list: List[Dict[str, Any]] = []
     timestamp = int(time.time())
-    
+
     for column_name, column_value in data.items():
         # Skip pipeline input fields and empty values
         if column_name in PIPELINE_INPUT_FIELDS or column_value is None or column_value == "":
             continue
-            
+
         # Get property_key from mapping, or empty string if not found
-        property_key = COLUMN_PROPERTY_MAPPING.get(column_name, "")
-        
+        property_key: str = COLUMN_PROPERTY_MAPPING.get(column_name, "")
+
         # Create GeneralProperty record
         property_entity = GeneralProperty(
             referrer_id=pipeline_input.id,
@@ -183,7 +183,7 @@ def create_general_properties_from_data(
         )
         db.add(property_entity)
         db.flush()
-        
+
         properties_list.append({
             "id": property_entity.id,
             "property_label": property_entity.property_label,
@@ -191,7 +191,7 @@ def create_general_properties_from_data(
             "property_value": property_entity.property_value,
             "created_at": property_entity.created_at,
         })
-    
+
     return properties_list
 
 
@@ -206,7 +206,7 @@ async def get_all_form_types():
             "description": config["description"],
             "field_count": len(config["fields"])
         })
-    
+
     return {
         "total": len(form_types),
         "form_types": form_types
@@ -218,20 +218,20 @@ async def get_form_fields(form_type: str, required: Optional[bool] = None):
     """Get form fields configuration for a specific form type"""
     if form_type not in FORM_CONFIGURATIONS:
         raise HTTPException(
-            status_code=404, 
+            status_code=404,
             detail=f"Form type '{form_type}' not found. Available types: {list(FORM_CONFIGURATIONS.keys())}"
         )
-    
+
     config = FORM_CONFIGURATIONS[form_type]
     fields = config["fields"]
-    
+
     # Filter by required parameter if provided
     if required is not None:
         fields = [field for field in fields if field.get("required", False) == required]
-    
+
     # Return only name and type for filtered fields
     simplified_fields = [{"name": field["name"], "type": field["type"]} for field in fields]
-    
+
     return {
         "form_type": form_type,
         "name": config["name"],
@@ -249,16 +249,16 @@ async def create_product_upload(
     """Single product upload with dynamic property creation"""
     try:
         db.begin()
-        
+
         # 1. Create/Get Pipeline Input
         pipeline_input = create_pipeline_input_from_data(data, db)
-        
+
         # 2. Create General Properties from remaining fields
         properties_list = create_general_properties_from_data(data, pipeline_input, db)
-        
+
         # Commit transaction
         db.commit()
-        
+
         return {
             "total": 1,
             "items": [
@@ -270,7 +270,7 @@ async def create_product_upload(
                 }
             ],
         }
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -285,7 +285,7 @@ async def create_bulk_product_upload(
     try:
         contents = await file.read()
         df = pd.read_csv(StringIO(contents.decode("utf-8")))
-        
+
         # Handle unnamed columns by using first non-empty row as headers
         if all(col.startswith("Unnamed:") for col in df.columns):
             # Find the first non-empty row to use as headers
@@ -294,18 +294,18 @@ async def create_bulk_product_upload(
                 if not all(pd.isna(val) or str(val).strip() == "" for val in row):
                     header_row_index = i
                     break
-            
+
             headers = df.iloc[header_row_index].tolist()
             # Skip empty rows and header row, start from data rows
             df = pd.read_csv(
-                StringIO(contents.decode("utf-8")), 
+                StringIO(contents.decode("utf-8")),
                 skiprows=header_row_index + 1,
                 names=headers
             )
             # Clean the dataframe to remove any remaining empty rows
             df = df.dropna(how='all')
         # For normal CSVs with proper headers, pandas handles it correctly
-        
+
         # Check required columns
         required_columns = ["Variant Name"]
         missing_columns = [col for col in required_columns if col not in df.columns]
@@ -314,17 +314,17 @@ async def create_bulk_product_upload(
                 status_code=400,
                 detail=f"Missing required columns: {', '.join(missing_columns)}",
             )
-        
-        successful_items = []
-        failed_items = []
-        
+
+        successful_items: List[Dict[str, Any]] = []
+        failed_items: List[Dict[str, Any]] = []
+
         for index, row in df.iterrows():
             try:
                 with db.begin_nested():
                     # Convert row to dictionary, handling NaN values
-                    row_data = {}
+                    row_data: Dict[str, Any] = {}
                     for col in df.columns:
-                        value = row[col]
+                        value: Any = row[col]
                         if pd.notna(value) and value != "" and str(value).strip() != "":
                             # Handle potential float conversion issues
                             if isinstance(value, float):
@@ -332,22 +332,22 @@ async def create_bulk_product_upload(
                                     row_data[col] = value
                             else:
                                 row_data[col] = value
-                    
+
                     # 1. Create/Get Pipeline Input
                     pipeline_input = create_pipeline_input_from_data(row_data, db)
-                    
+
                     # 2. Create General Properties from remaining fields
                     properties_list = create_general_properties_from_data(
                         row_data, pipeline_input, db
                     )
-                    
+
                     successful_items.append({
                         "id": pipeline_input.id,
                         "name": pipeline_input.name,
                         "created_at": pipeline_input.created_at,
                         "properties": properties_list,
                     })
-                    
+
             except Exception as e:
                 failed_items.append({
                     "row": index + 2,  # +2 because index starts at 0 and we skip header
@@ -355,10 +355,10 @@ async def create_bulk_product_upload(
                     "error": str(e),
                 })
                 continue
-        
+
         if successful_items:
             db.commit()
-        
+
         return {
             "total": len(successful_items),
             "items": successful_items,
@@ -367,7 +367,7 @@ async def create_bulk_product_upload(
             "failed": len(failed_items),
             "failed_items": failed_items,
         }
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
@@ -378,11 +378,11 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
     """Get all products with their dynamic properties"""
     try:
         products = db.query(PipelineInput).filter(PipelineInput.is_usable == 1).all()
-        
-        items = []
+
+        items: List[Dict[str, Any]] = []
         for product in products:
-            properties = []
-            
+            properties: List[Dict[str, Any]] = []
+
             # Get all properties for this product
             product_properties = (
                 db.query(GeneralProperty)
@@ -393,7 +393,7 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
                 )
                 .all()
             )
-            
+
             for prop in product_properties:
                 properties.append({
                     "id": prop.id,
@@ -402,16 +402,16 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
                     "property_value": prop.property_value,
                     "created_at": prop.created_at,
                 })
-            
+
             items.append({
                 "id": product.id,
                 "name": product.name,
                 "created_at": product.created_at,
                 "properties": properties,
             })
-        
+
         return {"total": len(items), "items": items}
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error fetching properties: {str(e)}"
@@ -427,43 +427,43 @@ async def update_product(
     """Update product with dynamic property handling"""
     try:
         db.begin()
-        
+
         # 1. Get existing pipeline input
         pipeline_input = (
             db.query(PipelineInput)
             .filter(PipelineInput.id == product_id, PipelineInput.is_usable == 1)
             .first()
         )
-        
+
         if not pipeline_input:
             raise HTTPException(status_code=404, detail="Product not found")
-        
+
         # Update pipeline input name if changed
         variant_name = data.get("Variant Name", "").lower()
         if variant_name and pipeline_input.name != variant_name:
             pipeline_input.name = variant_name
             db.flush()
-        
+
         # 2. Soft delete existing properties
         db.query(GeneralProperty).filter(
             GeneralProperty.referrer_id == product_id,
             GeneralProperty.property_type == "pipeline_input",
             GeneralProperty.is_usable == 1,
         ).update({"is_usable": 0})
-        
+
         # 3. Create new properties from updated data
         properties_list = create_general_properties_from_data(data, pipeline_input, db)
-        
+
         # Commit transaction
         db.commit()
-        
+
         return {
             "id": pipeline_input.id,
             "name": pipeline_input.name,
             "created_at": pipeline_input.created_at,
             "properties": properties_list,
         }
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -477,31 +477,31 @@ async def delete_product(
     """Soft delete product and its properties"""
     try:
         db.begin()
-        
+
         # 1. Get pipeline input
         pipeline_input = (
             db.query(PipelineInput)
             .filter(PipelineInput.id == product_id, PipelineInput.is_usable == 1)
             .first()
         )
-        
+
         if not pipeline_input:
             raise HTTPException(status_code=404, detail="Product not found")
-        
+
         # 2. Soft delete pipeline input and properties
-        pipeline_input.is_usable = 0
-        
+        pipeline_input.is_usable = 0  # type: ignore
+
         db.query(GeneralProperty).filter(
             GeneralProperty.referrer_id == product_id,
             GeneralProperty.property_type == "pipeline_input",
             GeneralProperty.is_usable == 1,
         ).update({"is_usable": 0})
-        
+
         # Commit transaction
         db.commit()
-        
+
         return {"message": "Product successfully deleted"}
-        
+
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

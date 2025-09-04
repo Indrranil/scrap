@@ -8,6 +8,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from app.auth.auth import AuthMiddleware
 from app.database.connection import Base, engine
+from app.routers.admin import router as admin_router
 
 # Import routers
 from app.routers.application import router as application_router
@@ -21,7 +22,6 @@ from app.routers.pipeline_session_output_unit import (
     router as pipeline_session_output_unit_router,
 )
 from app.routers.product import router as product_router
-from app.routers.admin import router as admin_router
 from app.routers.signin import router as signin_router
 from app.routers.users import router as user_router
 from app.routers.ws_router import broadcast_controller, output_stream_router
