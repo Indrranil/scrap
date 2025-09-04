@@ -10,7 +10,7 @@ from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
 from app.models.pipeline_input import PipelineInput
 
-router = APIRouter(prefix="/v1/admin/product", tags=["admin-product"])
+router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
 # Hardcoded mapping for column_name to property_key
 COLUMN_PROPERTY_MAPPING = {
@@ -43,6 +43,86 @@ COLUMN_PROPERTY_MAPPING = {
 
 # Pipeline Input core fields that go directly to PipelineInput table
 PIPELINE_INPUT_FIELDS = {"Variant Name"}
+
+# Form field configurations for different form types
+FORM_CONFIGURATIONS = {
+    "product": {
+        "name": "Product Form",
+        "description": "Form for creating/editing product variants",
+        "fields": [
+            {
+                "name": "Variant Name",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "Product Name",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Form Factor",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Price",
+                "type": "float",
+                "required": False
+            },
+            {
+                "name": "Target Weight (g)",
+                "type": "float",
+                "required": False
+            },
+            {
+                "name": "Tare Weight (g)",
+                "type": "float",
+                "required": False
+            },
+            {
+                "name": "Material Code-Front",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Material Code-Back",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Factory Code",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "USP",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Manufacturing Date",
+                "type": "date",
+                "required": False
+            },
+            {
+                "name": "Expiry Date",
+                "type": "date",
+                "required": False
+            },
+            {
+                "name": "Variant Barcode",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "CLD Barcode",
+                "type": "text",
+                "required": False
+            }
+        ]
+    }
+}
 
 
 def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> PipelineInput:
@@ -115,7 +195,53 @@ def create_general_properties_from_data(
     return properties_list
 
 
-@router.post("/")
+@router.get("/form-fields")
+async def get_all_form_types():
+    """Get all available form types"""
+    form_types = []
+    for form_type, config in FORM_CONFIGURATIONS.items():
+        form_types.append({
+            "type": form_type,
+            "name": config["name"],
+            "description": config["description"],
+            "field_count": len(config["fields"])
+        })
+    
+    return {
+        "total": len(form_types),
+        "form_types": form_types
+    }
+
+
+@router.get("/form-fields/{form_type}")
+async def get_form_fields(form_type: str, required: Optional[bool] = None):
+    """Get form fields configuration for a specific form type"""
+    if form_type not in FORM_CONFIGURATIONS:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Form type '{form_type}' not found. Available types: {list(FORM_CONFIGURATIONS.keys())}"
+        )
+    
+    config = FORM_CONFIGURATIONS[form_type]
+    fields = config["fields"]
+    
+    # Filter by required parameter if provided
+    if required is not None:
+        fields = [field for field in fields if field.get("required", False) == required]
+    
+    # Return only name and type for filtered fields
+    simplified_fields = [{"name": field["name"], "type": field["type"]} for field in fields]
+    
+    return {
+        "form_type": form_type,
+        "name": config["name"],
+        "description": config["description"],
+        "fields": simplified_fields,
+        "total_fields": len(simplified_fields)
+    }
+
+
+@router.post("/product")
 async def create_product_upload(
     data: Dict[str, Any],
     db: Session = Depends(get_db),
@@ -150,7 +276,7 @@ async def create_product_upload(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/bulk")
+@router.post("/product/bulk")
 async def create_bulk_product_upload(
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -170,11 +296,14 @@ async def create_bulk_product_upload(
                     break
             
             headers = df.iloc[header_row_index].tolist()
+            # Skip empty rows and header row, start from data rows
             df = pd.read_csv(
                 StringIO(contents.decode("utf-8")), 
-                skiprows=header_row_index + 1, 
+                skiprows=header_row_index + 1,
                 names=headers
             )
+            # Clean the dataframe to remove any remaining empty rows
+            df = df.dropna(how='all')
         # For normal CSVs with proper headers, pandas handles it correctly
         
         # Check required columns
@@ -196,8 +325,13 @@ async def create_bulk_product_upload(
                     row_data = {}
                     for col in df.columns:
                         value = row[col]
-                        if pd.notna(value):
-                            row_data[col] = value
+                        if pd.notna(value) and value != "" and str(value).strip() != "":
+                            # Handle potential float conversion issues
+                            if isinstance(value, float):
+                                if not (value == float('inf') or value == float('-inf') or value != value):
+                                    row_data[col] = value
+                            else:
+                                row_data[col] = value
                     
                     # 1. Create/Get Pipeline Input
                     pipeline_input = create_pipeline_input_from_data(row_data, db)
@@ -239,7 +373,7 @@ async def create_bulk_product_upload(
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
 
 
-@router.get("/properties")
+@router.get("/product/properties")
 async def get_all_product_properties(db: Session = Depends(get_db)):
     """Get all products with their dynamic properties"""
     try:
@@ -284,7 +418,7 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
         )
 
 
-@router.put("/{product_id}")
+@router.put("/product/{product_id}")
 async def update_product(
     product_id: int,
     data: Dict[str, Any],
@@ -335,7 +469,7 @@ async def update_product(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.delete("/{product_id}")
+@router.delete("/product/{product_id}")
 async def delete_product(
     product_id: int,
     db: Session = Depends(get_db),
@@ -373,7 +507,7 @@ async def delete_product(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.get("/column-mapping")
+@router.get("/product/column-mapping")
 async def get_column_mapping():
     """Get the hardcoded column to property_key mapping"""
     return {
