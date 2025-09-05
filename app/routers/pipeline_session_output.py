@@ -28,8 +28,8 @@ router = APIRouter(
 async def create_pipeline_session_output(
     pipeline_session_output: PipelineSessionOutputCreate,
     manual: Optional[int] = Query(0),
-    property_key: Optional[str] = Query(None, alias="property-key"),
-    property_type: Optional[str] = Query(None, alias="property-type"),
+    property_key: Optional[str] = Query(None, alias="property_key"),
+    property_type: Optional[str] = Query(None, alias="property_type"),
     db: Session = Depends(get_db),
     _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
