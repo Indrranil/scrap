@@ -46,52 +46,111 @@ PIPELINE_INPUT_FIELDS: set[str] = {"Variant Name"}
 
 # Form field configurations for different form types
 FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
-    "product": {
-        "name": "Product Form",
-        "description": "Form for creating/editing product variants",
+    "users": {
+        "name": "User Management Form",
+        "description": "Form for creating/editing users",
         "fields": [
+            {
+                "name": "First Name",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "Last Name",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "Email Address",
+                "type": "email",
+                "required": False
+            },
+            {
+                "name": "Role",
+                "type": "select",
+                "options": ["admin", "user"],
+                "required": False
+            },
+            {
+                "name": "Designation",
+                "type": "select",
+                "options": ["LQC", "SHIFT EXECUTIVE", "QUALITY EXECUTIVE"],
+                "required": False
+            }
+        ]
+    },
+    "machines": {
+        "name": "Machine Configuration Form",
+        "description": "Form for setting up machines",
+        "fields": [
+            {
+                "name": "Name",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "IP Address",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "MAC Address",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "Machine Type",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "Baud Rate",
+                "type": "number",
+                "required": True
+            },
+            {
+                "name": "Starting Address",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "Unit Name",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Factory Name",
+                "type": "text",
+                "required": False
+            }
+        ]
+    },
+    "product-carton": {
+        "name": "Carton Product Form",
+        "description": "Form for creating/editing carton products",
+        "fields": [
+            {
+                "name": "CLD Barcode",
+                "type": "text",
+                "required": True
+            },
             {
                 "name": "Variant Name",
                 "type": "text",
                 "required": True
             },
             {
-                "name": "Product Name",
+                "name": "Barcode",
                 "type": "text",
-                "required": False
+                "required": True
             },
             {
-                "name": "Form Factor",
+                "name": "Factory Code",
                 "type": "text",
                 "required": False
             },
             {
                 "name": "Price",
-                "type": "float",
-                "required": False
-            },
-            {
-                "name": "Target Weight (g)",
-                "type": "float",
-                "required": False
-            },
-            {
-                "name": "Tare Weight (g)",
-                "type": "float",
-                "required": False
-            },
-            {
-                "name": "Material Code-Front",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Material Code-Back",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Factory Code",
                 "type": "text",
                 "required": False
             },
@@ -102,22 +161,73 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
             },
             {
                 "name": "Manufacturing Date",
-                "type": "date",
+                "type": "text",
                 "required": False
             },
             {
-                "name": "Expiry Date",
-                "type": "date",
+                "name": "Factory Code Tube",
+                "type": "text",
                 "required": False
+            },
+            {
+                "name": "Manufacturing Date Tube",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Batch Code Tube",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Primary Carton Material Code",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Tube Material Code",
+                "type": "text",
+                "required": False
+            },
+            {
+                "name": "Target Weight",
+                "type": "float",
+                "required": False
+            }
+        ]
+    },
+    "product-sachet": {
+        "name": "Sachet Product Form",
+        "description": "Form for creating/editing sachet products",
+        "fields": [
+            {
+                "name": "CLD Barcode",
+                "type": "text",
+                "required": True
+            },
+            {
+                "name": "Variant Name",
+                "type": "text",
+                "required": True
             },
             {
                 "name": "Variant Barcode",
                 "type": "text",
+                "required": True
+            },
+            {
+                "name": "Perforation",
+                "type": "text",
                 "required": False
             },
             {
-                "name": "CLD Barcode",
+                "name": "Other",
                 "type": "text",
+                "required": False
+            },
+            {
+                "name": "Target Weight",
+                "type": "float",
                 "required": False
             }
         ]
