@@ -1,5 +1,4 @@
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
@@ -13,18 +12,14 @@ IMAGES_BASE_DIR = Path(__file__).parent.parent / "images"
 VALID_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.ico'}
 
 
-@router.get("/{image_path:path}")
+@router.get("/")
 async def get_image(
-    image_path: str,
-    folder: Optional[str] = Query(None, description="Optional subfolder within images directory")
+    path: str = Query(..., description="Relative path to image file from images directory")
 ):
-    """Get image file from the images directory"""
+    """Get image file using relative path from images directory"""
     try:
-        # Construct the full path
-        if folder:
-            full_path = IMAGES_BASE_DIR / folder / image_path
-        else:
-            full_path = IMAGES_BASE_DIR / image_path
+        # Construct the full path from the relative path
+        full_path = IMAGES_BASE_DIR / path
 
         # Normalize the path to prevent directory traversal attacks
         full_path = full_path.resolve()
@@ -40,7 +35,7 @@ async def get_image(
         if not full_path.exists() or not full_path.is_file():
             raise HTTPException(
                 status_code=404,
-                detail=f"Image not found: {image_path}"
+                detail=f"Image not found: {path}"
             )
 
         # Check if it's a valid image file
@@ -63,47 +58,4 @@ async def get_image(
         raise HTTPException(
             status_code=500,
             detail=f"Error retrieving image: {str(e)}"
-        )
-
-
-@router.get("/")
-async def list_images(
-    folder: Optional[str] = Query(None, description="Optional subfolder to list images from")
-):
-    """List all images in the images directory or specified subfolder"""
-    try:
-        # Construct the directory path
-        target_dir = IMAGES_BASE_DIR / folder if folder else IMAGES_BASE_DIR
-
-        # Check if directory exists
-        if not target_dir.exists():
-            raise HTTPException(
-                status_code=404,
-                detail=f"Directory not found: {folder or 'images'}"
-            )
-
-        # Get all image files
-        images = []
-        for file_path in target_dir.rglob("*"):
-            if file_path.is_file() and file_path.suffix.lower() in VALID_IMAGE_EXTENSIONS:
-                relative_path = file_path.relative_to(target_dir)
-                images.append({
-                    "name": file_path.name,
-                    "path": str(relative_path),
-                    "size": file_path.stat().st_size,
-                    "extension": file_path.suffix.lower()
-                })
-
-        return {
-            "directory": str(target_dir),
-            "total": len(images),
-            "images": images
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error listing images: {str(e)}"
         )
