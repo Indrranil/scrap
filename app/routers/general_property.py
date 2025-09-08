@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.auth.auth import require_roles
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
 from app.schemas.general_property import GeneralPropertyBase, GeneralPropertyUpdate
@@ -14,26 +15,33 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/v1/general-property", tags=["General Property"])
 
 
-@router.get("/")
+@router.get("/all")
 async def get_all_properties(
     property_type: Optional[str] = "%",
     property_key: Optional[str] = "%",
     property_value: Optional[str] = "%",
+    referrer_id: Optional[int] = None,
     db: Session = Depends(get_db),
 ):
     try:
+        # Build base query with filters
+        base_filters = [
+            GeneralProperty.property_key.like(property_key),
+            GeneralProperty.property_type.like(property_type),
+            GeneralProperty.property_value.like(property_value),
+            GeneralProperty.is_usable == 1,
+        ]
+
+        # Add referrer_id filter if provided
+        if referrer_id is not None:
+            base_filters.append(GeneralProperty.referrer_id == referrer_id)
 
         properties_subquery = (
             db.query(
                 GeneralProperty.property_label,
                 func.min(GeneralProperty.id).label("min_id"),
             )
-            .filter(
-                GeneralProperty.property_key.like(property_key),
-                GeneralProperty.property_type.like(property_type),
-                GeneralProperty.property_value.like(property_value),
-                GeneralProperty.is_usable == 1,
-            )
+            .filter(*base_filters)
             .group_by(GeneralProperty.property_label)
             .subquery()
         )
@@ -54,6 +62,7 @@ async def get_all_properties(
                 "description": f"Property for {prop.property_label}",
                 "property_label": prop.property_label,
                 "property_key": prop.property_key,
+                "property_value": prop.property_value,
                 "property_value_type": "string",
                 "created_at": prop.created_at,
             }
@@ -65,6 +74,32 @@ async def get_all_properties(
     except Exception as e:
         raise HTTPException(
             status_code=500, detail=f"Error fetching properties: {str(e)}"
+        )
+
+
+@router.get("/{general_property_id}")
+async def get_pipeline_session_output_unit(
+        general_property_id: int,
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"])),
+):
+    try:
+        general_property = db.query(GeneralProperty).filter(GeneralProperty.id == general_property_id).first()
+
+        if not general_property:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Pipeline session output unit with ID {general_property} not found",
+            )
+
+        return general_property
+
+    except HTTPException as he:
+        raise he
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching general property: {str(e)}",
         )
 
 

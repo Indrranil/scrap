@@ -34,7 +34,7 @@ async def get_all_pipelines(db: Session = Depends(get_db)):
                 db.query(GeneralProperty)
                 .filter(
                     GeneralProperty.referrer_id == pipeline.id,
-                    GeneralProperty.property_type == "pipeline",
+                    GeneralProperty.property_type == "pipeline_session",
                     GeneralProperty.is_usable == 1,
                 )
                 .order_by(GeneralProperty.id.desc())
@@ -77,7 +77,7 @@ async def get_pipeline(pipeline_id: int, db: Session = Depends(get_db)):
             db.query(GeneralProperty)
             .filter(
                 GeneralProperty.referrer_id == pipeline_id,
-                GeneralProperty.property_type == "pipeline",
+                GeneralProperty.property_type == "pipeline_session",
                 GeneralProperty.is_usable == 1,
             )
             .all()

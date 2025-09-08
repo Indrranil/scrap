@@ -10,6 +10,7 @@ from app.database.connection import get_db
 from app.models.pipeline_session_output_unit import (
     PipelineSessionOutputUnit as PipelineSessionOutputUnitModel,
 )
+from app.schemas.pipeline_session import BasicFilter
 from app.schemas.pipeline_session_output_unit import (
     BatchUpdateResponse,
     PipelineSessionOutputUnit,
@@ -25,9 +26,9 @@ router = APIRouter(
 
 @router.post("/new", response_model=PipelineSessionOutputUnit, status_code=201)
 async def create_pipeline_session_output_unit(
-    unit: PipelineSessionOutputUnitCreate,
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"])),
+        unit: PipelineSessionOutputUnitCreate,
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     try:
         db.begin()
@@ -59,11 +60,47 @@ async def create_pipeline_session_output_unit(
         )
 
 
+@router.get("/all")
+async def get_all_pipeline_session_output_units(
+        pipeline_session_output_id: int = Query(default=None),
+        status_: str = Query(default=None, alias="status"),
+        filters: BasicFilter = Depends(),
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"])),
+):
+    try:
+        units = (
+            db.query(PipelineSessionOutputUnitModel)
+            .filter(
+                PipelineSessionOutputUnitModel.is_usable == 1,
+            )
+        )
+
+        if pipeline_session_output_id is not None:
+            units = units.filter(PipelineSessionOutputUnitModel.pipeline_session_output_id
+                                 == pipeline_session_output_id)
+
+        if status_ is not None:
+            units = units.filter(PipelineSessionOutputUnitModel.status == status_)
+
+        if filters.limit <= 0:
+            units = units.limit(15)
+
+        units_list = units.all()
+
+        response_payload = {"total": len(units_list), "items": [vars(unit) for unit in units_list]}
+        return response_payload
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{unit_id}", response_model=PipelineSessionOutputUnit)
 async def get_pipeline_session_output_unit(
-    unit_id: int,
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"])),
+        unit_id: int,
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     try:
         unit = (
@@ -92,40 +129,14 @@ async def get_pipeline_session_output_unit(
         )
 
 
-@router.get("/", response_model=PipelineSessionOutputUnitResponse)
-async def get_all_pipeline_session_output_units(
-    pipeline_session_output_id: int = Query(...),
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"])),
-):
-    try:
-        units = (
-            db.query(PipelineSessionOutputUnitModel)
-            .filter(
-                PipelineSessionOutputUnitModel.pipeline_session_output_id
-                == pipeline_session_output_id,
-                PipelineSessionOutputUnitModel.is_usable == 1,
-            )
-            .all()
-        )
-
-        response_payload = {"total": len(units), "items": units}
-        print(response_payload)
-        return response_payload
-
-    except Exception as e:
-        print(e)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
 @router.patch(
     "/", status_code=status.HTTP_200_OK, response_model=PipelineSessionOutputUnit
 )
 async def update_pipeline_session_output_unit(
-    unit_update: PipelineSessionOutputUnitUpdate,
-    unit_id: int = Query(...),  # Using ... makes it required
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"])),
+        unit_update: PipelineSessionOutputUnitUpdate,
+        unit_id: int = Query(...),  # Using ... makes it required
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     try:
         db.begin()
@@ -167,11 +178,11 @@ async def update_pipeline_session_output_unit(
 
 @router.patch("/all", response_model=BatchUpdateResponse)
 async def update_batch_pipeline_session_output_units(
-    unit_update: PipelineSessionOutputUnitUpdate,
-    pipeline_session_output_id: Optional[int] = Query(None),
-    output_key: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["app_admin", "app_user"])),
+        unit_update: PipelineSessionOutputUnitUpdate,
+        pipeline_session_output_id: Optional[int] = Query(None),
+        output_key: Optional[str] = Query(None),
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     try:
         db.begin()

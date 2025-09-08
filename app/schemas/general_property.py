@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class GeneralPropertyBase(BaseModel):
     referrer_id: int
-    property_type: Literal["machine", "pipeline", "application", "pipeline_input"]
+    property_type: Literal["machine", "pipeline", "application", "pipeline_input", "pipeline_session"]
     property_label: str
     property_key: str
     property_value: str

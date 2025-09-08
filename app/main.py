@@ -8,6 +8,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 
 from app.auth.auth import AuthMiddleware
 from app.database.connection import Base, engine
+from app.routers.admin import router as admin_router
 
 # Import routers
 from app.routers.application import router as application_router
@@ -49,6 +50,7 @@ app.include_router(pipeline_session_router)
 app.include_router(pipeline_session_output_router)
 app.include_router(pipeline_session_output_unit_router)
 app.include_router(product_router)
+app.include_router(admin_router)
 app.include_router(property_router)
 app.include_router(signin_router)
 app.include_router(user_router)
