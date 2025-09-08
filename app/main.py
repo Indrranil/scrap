@@ -14,6 +14,7 @@ from app.routers.admin import router as admin_router
 from app.routers.application import router as application_router
 from app.routers.device import router as device_router
 from app.routers.general_property import router as property_router
+from app.routers.images import router as images_router
 from app.routers.pipeline import router as pipeline_router
 from app.routers.pipeline_input import router as pipeline_input_router
 from app.routers.pipeline_session import router as pipeline_session_router
@@ -45,6 +46,7 @@ app.add_middleware(AuthMiddleware)
 # Include routers
 app.include_router(application_router)
 app.include_router(device_router)
+app.include_router(images_router)
 app.include_router(pipeline_router)
 app.include_router(pipeline_session_router)
 app.include_router(pipeline_session_output_router)
