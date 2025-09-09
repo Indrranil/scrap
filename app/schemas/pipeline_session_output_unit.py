@@ -32,6 +32,7 @@ class PipelineSessionOutputUnitUpdate(BaseModel):
     name: Optional[str] = None
     output_key: Optional[str] = None
     output_value: Optional[str] = None
+    verdict: Optional[int] = None
     status: Optional[UnitStatus] = None
 
 
