@@ -53,29 +53,34 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
             {
                 "name": "First Name",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "first_name"
             },
             {
                 "name": "Last Name",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "last_name"
             },
             {
                 "name": "Email Address",
                 "type": "email",
-                "required": False
+                "required": False,
+                "property_type": "email_address"
             },
             {
                 "name": "Role",
                 "type": "select",
                 "options": ["admin", "user"],
-                "required": False
+                "required": False,
+                "property_type": "role"
             },
             {
                 "name": "Designation",
                 "type": "select",
                 "options": ["LQC", "SHIFT EXECUTIVE", "QUALITY EXECUTIVE"],
-                "required": False
+                "required": False,
+                "property_type": "designation"
             }
         ]
     },
@@ -86,42 +91,50 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
             {
                 "name": "Name",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "name"
             },
             {
                 "name": "IP Address",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "ip_address"
             },
             {
                 "name": "MAC Address",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "mac_address"
             },
             {
                 "name": "Machine Type",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "machine_type"
             },
             {
                 "name": "Baud Rate",
                 "type": "number",
-                "required": True
+                "required": True,
+                "property_type": "baud_rate"
             },
             {
                 "name": "Starting Address",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "starting_address"
             },
             {
                 "name": "Unit Name",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "unit_name"
             },
             {
                 "name": "Factory Name",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "factory_name"
             }
         ]
     },
@@ -132,67 +145,80 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
             {
                 "name": "CLD Barcode",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "cld_barcode"
             },
             {
                 "name": "Variant Name",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "product_info"
             },
             {
                 "name": "Barcode",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "carton_coding"
             },
             {
                 "name": "Factory Code",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "carton_coding"
             },
             {
                 "name": "Price",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "carton_coding"
             },
             {
                 "name": "USP",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "carton_coding"
             },
             {
                 "name": "Manufacturing Date",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "carton_coding"
             },
             {
                 "name": "Factory Code Tube",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "tube_coding"
             },
             {
                 "name": "Manufacturing Date Tube",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "tube_coding"
             },
             {
                 "name": "Batch Code Tube",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "tube_coding"
             },
             {
                 "name": "Primary Carton Material Code",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "primary_carton_material_code"
             },
             {
                 "name": "Tube Material Code",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "tube_material_code"
             },
             {
                 "name": "Target Weight",
                 "type": "float",
-                "required": False
+                "required": False,
+                "property_type": "target_weight"
             }
         ]
     },
@@ -203,32 +229,38 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
             {
                 "name": "CLD Barcode",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "sachet_coding"
             },
             {
                 "name": "Variant Name",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "product_info"
             },
             {
                 "name": "Variant Barcode",
                 "type": "text",
-                "required": True
+                "required": True,
+                "property_type": "sachet_coding"
             },
             {
                 "name": "Perforation",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "physical_properties"
             },
             {
                 "name": "Other",
                 "type": "text",
-                "required": False
+                "required": False,
+                "property_type": "additional_info"
             },
             {
                 "name": "Target Weight",
                 "type": "float",
-                "required": False
+                "required": False,
+                "property_type": "physical_properties"
             }
         ]
     }
@@ -339,8 +371,8 @@ async def get_form_fields(form_type: str, required: Optional[bool] = None):
     if required is not None:
         fields = [field for field in fields if field.get("required", False) == required]
 
-    # Return only name and type for filtered fields
-    simplified_fields = [{"name": field["name"], "type": field["type"]} for field in fields]
+    # Return name, type, and property_type for filtered fields
+    simplified_fields = [{"name": field["name"], "type": field["type"], "property_type": field.get("property_type", "")} for field in fields]
 
     return {
         "form_type": form_type,
