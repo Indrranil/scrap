@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
+from app.models.machine import Machine
 from app.models.pipeline_input import PipelineInput
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
@@ -43,6 +44,9 @@ COLUMN_PROPERTY_MAPPING: Dict[str, str] = {
 
 # Pipeline Input core fields that go directly to PipelineInput table
 PIPELINE_INPUT_FIELDS: set[str] = {"Variant Name"}
+
+# Machine core fields that go directly to Machine table
+MACHINE_FIELDS: set[str] = {"Name", "Machine Type"}
 
 # Form field configurations for different form types
 FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
@@ -337,6 +341,81 @@ def create_general_properties_from_data(
     return properties_list
 
 
+def create_machine_from_data(data: Dict[str, Any], db: Session) -> Machine:
+    """Create or get existing Machine from data"""
+    machine_name = data.get("Name", "").strip()
+    machine_type = data.get("Machine Type", "").strip()
+
+    if not machine_name:
+        raise ValueError("Machine Name is required")
+    if not machine_type:
+        raise ValueError("Machine Type is required")
+
+    # Check if machine already exists
+    machine = (
+        db.query(Machine)
+        .filter(
+            Machine.name == machine_name,
+            Machine.machine_type == machine_type,
+            Machine.is_usable == 1,
+        )
+        .first()
+    )
+
+    if not machine:
+        machine = Machine(
+            name=machine_name,
+            machine_type=machine_type,
+            created_at=int(time.time()),
+            is_usable=1
+        )
+        db.add(machine)
+        db.flush()
+
+    return machine
+
+
+def create_machine_properties_from_data(
+    data: Dict[str, Any],
+    machine: Machine,
+    db: Session
+) -> List[Dict[str, Any]]:
+    """Create GeneralProperty records from machine data fields"""
+    properties_list: List[Dict[str, Any]] = []
+    timestamp = int(time.time())
+
+    for column_name, column_value in data.items():
+        # Skip machine fields and empty values
+        if column_name in MACHINE_FIELDS or column_value is None or column_value == "":
+            continue
+
+        # Convert column name to property_key (lowercase with underscores)
+        property_key = column_name.lower().replace(" ", "_").replace("-", "_")
+
+        # Create GeneralProperty record
+        property_entity = GeneralProperty(
+            referrer_id=machine.id,
+            property_type="machine",
+            property_key=property_key,
+            property_label=column_name,
+            property_value=str(column_value),
+            created_at=timestamp,
+            is_usable=1,
+        )
+        db.add(property_entity)
+        db.flush()
+
+        properties_list.append({
+            "id": property_entity.id,
+            "property_label": property_entity.property_label,
+            "property_key": property_entity.property_key,
+            "property_value": property_entity.property_value,
+            "created_at": property_entity.created_at,
+        })
+
+    return properties_list
+
+
 @router.get("/form-fields")
 async def get_all_form_types():
     """Get all available form types"""
@@ -513,6 +592,186 @@ async def create_bulk_product_upload(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+@router.post("/machine/bulk")
+async def create_bulk_machine_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Bulk machine upload with dynamic property creation from CSV"""
+    try:
+        contents = await file.read()
+        df = pd.read_csv(StringIO(contents.decode("utf-8")))
+
+        # Handle unnamed columns by using first non-empty row as headers
+        if all(col.startswith("Unnamed:") for col in df.columns):
+            # Find the first non-empty row to use as headers
+            header_row_index: int = 0
+            for i, row in df.iterrows():
+                if not all(pd.isna(val) or str(val).strip() == "" for val in row):
+                    header_row_index = i  # type: ignore
+                    break
+
+            headers = df.iloc[header_row_index].tolist()
+            # Skip empty rows and header row, start from data rows
+            df = pd.read_csv(
+                StringIO(contents.decode("utf-8")),
+                skiprows=header_row_index + 1,
+                names=headers
+            )
+            # Clean the dataframe to remove any remaining empty rows
+            df = df.dropna(how='all')
+        # For normal CSVs with proper headers, pandas handles it correctly
+
+        # Check required columns
+        required_columns = ["Name", "Machine Type"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required columns: {', '.join(missing_columns)}",
+            )
+
+        successful_items: List[Dict[str, Any]] = []
+        failed_items: List[Dict[str, Any]] = []
+
+        for index, row in df.iterrows():
+            try:
+                with db.begin_nested():
+                    # Convert row to dictionary, handling NaN values
+                    row_data: Dict[str, Any] = {}
+                    for col in df.columns:
+                        value: Any = row[col]
+                        if pd.notna(value) and value != "" and str(value).strip() != "":
+                            # Handle potential float conversion issues
+                            if isinstance(value, float):
+                                if not (value == float('inf') or value == float('-inf') or value != value):
+                                    row_data[col] = value
+                            else:
+                                row_data[col] = value
+
+                    # 1. Create/Get Machine
+                    machine = create_machine_from_data(row_data, db)
+
+                    # 2. Create General Properties from remaining fields
+                    properties_list = create_machine_properties_from_data(
+                        row_data, machine, db
+                    )
+
+                    successful_items.append({
+                        "id": machine.id,
+                        "name": machine.name,
+                        "machine_type": machine.machine_type,
+                        "created_at": machine.created_at,
+                        "properties": properties_list,
+                    })
+
+            except Exception as e:
+                failed_items.append({
+                    "row": index + 2,  # type: ignore  # +2 because index starts at 0 and we skip header
+                    "machine_name": row.get("Name", "Unknown"),
+                    "error": str(e),
+                })
+                continue
+
+        if successful_items:
+            db.commit()
+
+        return {
+            "total": len(successful_items),
+            "items": successful_items,
+            "total_processed": len(df),
+            "successful": len(successful_items),
+            "failed": len(failed_items),
+            "failed_items": failed_items,
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+@router.post("/machine")
+async def create_machine_upload(
+    data: Dict[str, Any],
+    db: Session = Depends(get_db),
+):
+    """Single machine upload with dynamic property creation"""
+    try:
+        db.begin()
+
+        # 1. Create/Get Machine
+        machine = create_machine_from_data(data, db)
+
+        # 2. Create General Properties from remaining fields
+        properties_list = create_machine_properties_from_data(data, machine, db)
+
+        # Commit transaction
+        db.commit()
+
+        return {
+            "total": 1,
+            "items": [
+                {
+                    "id": machine.id,
+                    "name": machine.name,
+                    "machine_type": machine.machine_type,
+                    "created_at": machine.created_at,
+                    "properties": properties_list,
+                }
+            ],
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/machine/properties")
+async def get_all_machine_properties(db: Session = Depends(get_db)):
+    """Get all machines with their dynamic properties"""
+    try:
+        machines = db.query(Machine).filter(Machine.is_usable == 1).all()
+
+        items: List[Dict[str, Any]] = []
+        for machine in machines:
+            properties: List[Dict[str, Any]] = []
+
+            # Get all properties for this machine
+            machine_properties = (
+                db.query(GeneralProperty)
+                .filter(
+                    GeneralProperty.referrer_id == machine.id,
+                    GeneralProperty.property_type == "machine",
+                    GeneralProperty.is_usable == 1,
+                )
+                .all()
+            )
+
+            for prop in machine_properties:
+                properties.append({
+                    "id": prop.id,
+                    "property_label": prop.property_label,
+                    "property_key": prop.property_key,
+                    "property_value": prop.property_value,
+                    "created_at": prop.created_at,
+                })
+
+            items.append({
+                "id": machine.id,
+                "name": machine.name,
+                "machine_type": machine.machine_type,
+                "created_at": machine.created_at,
+                "properties": properties,
+            })
+
+        return {"total": len(items), "items": items}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching machine properties: {str(e)}"
+        )
 
 
 @router.get("/product/properties")
