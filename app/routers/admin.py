@@ -1,6 +1,6 @@
 import time
 from io import StringIO
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -14,21 +14,21 @@ router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
 # Hardcoded mapping for column_name to property_key
 COLUMN_PROPERTY_MAPPING: Dict[str, str] = {
-    "Machine Code-Front": "front",
-    "Machine Code-Back": "back",
-    "Material Code-Front": "material_front",
-    "Material Code-Back": "material_back",
-    "Factory Code": "factory_code",
-    "Price": "price",
-    "USP": "usp",
-    "Manufacturing Date": "manufacturing_date",
-    "Expiry Date": "expiry_date",
-    "Target Weight (g)": "target_weight",
-    "Tare Weight (g)": "tare_weight",
-    "Form Factor": "form_factor",
-    "Product Name": "product_name",
-    "Variant Barcode": "variant_barcode",
-    "CLD Barcode": "cld_barcode",
+    "Machine Code-Front": {"property_key": "front", "property_label": "Front"},
+    "Machine Code-Back": {"property_key": "back", "property_label": "Back"},
+    "Material Code-Front": {"property_key": "material_code", "property_label": "Front"},
+    "Material Code-Back": {"property_key": "material_code", "property_label": "Back"},
+    "Factory Code": {"property_key": "coding", "property_label": "Factory Code"},
+    "Price": {"property_key": "coding", "property_label": "Price"},
+    "USP": {"property_key": "coding", "property_label": "USP"},
+    "Manufacturing Date": {"property_key": "coding", "property_label": "Manufacturing Date"},
+    "Expiry Date": {"property_key": "coding", "property_label": "Expiry Date"},
+    "Target Weight (g)": {"property_key": "target_weight", "property_label": "Weight"},
+    "Tare Weight (g)": {"property_key": "target_weight", "property_label": "Weight"},
+    "Form Factor": {"property_key": "form_factor", "property_label": "Form Factor"},
+    "Product Name": {"property_key": "product_name", "property_label": "Product Name"},
+    "Variant Barcode": {"property_key": "variant_barcode", "property_label": "Barcode"},
+    "CLD Barcode": {"property_key": "cld_barcode", "property_label": "CLD Barcode"},
     "Front Face": "front_face",
     "Back Face": "back_face",
     "Left Face": "left_face",
@@ -279,14 +279,15 @@ def create_general_properties_from_data(
             continue
 
         # Get property_key from mapping, or empty string if not found
-        property_key: str = COLUMN_PROPERTY_MAPPING.get(column_name, "")
+        property_key: str = COLUMN_PROPERTY_MAPPING.get(column_name, {}).get("property_key", "")
+        property_label: str = COLUMN_PROPERTY_MAPPING.get(column_name, {}).get("property_label", "")
 
         # Create GeneralProperty record
         property_entity = GeneralProperty(
             referrer_id=pipeline_input.id,
             property_type="pipeline_input",
             property_key=property_key,
-            property_label=column_name,
+            property_label=property_label,
             property_value=str(column_value),
             created_at=timestamp,
             is_usable=1,
