@@ -18,10 +18,23 @@ COLUMN_PROPERTY_MAPPING: Dict[str, str] = {
     "Machine Code-Back": {"property_key": "back", "property_label": "Back"},
     "Material Code-Front": {"property_key": "material_code", "property_label": "Front"},
     "Material Code-Back": {"property_key": "material_code", "property_label": "Back"},
+    "Primary Carton Material Code": {"property_key": "primary_carton_material_code",
+                                     "property_label": "Primary Carton Material Code"},
+    "Secondary Carton Material Code": {"property_key": "secondary_carton_material_code",
+                                       "property_label": "Secondary Carton Material Code"},
+    "Tube Material Code": {"property_key": "tube_material_code", "property_label": "Tube Material Code"},
     "Factory Code": {"property_key": "coding", "property_label": "Factory Code"},
+    "Carton Factory Code": {"property_key": "carton_coding", "property_label": "Factory Code"},
+    "Tube Factory Code": {"property_key": "tube_coding", "property_label": "Factory Code"},
     "Price": {"property_key": "coding", "property_label": "Price"},
+    "Carton Price": {"property_key": "carton_coding", "property_label": "Price"},
+    "Tube Price": {"property_key": "tube_coding", "property_label": "Price"},
     "USP": {"property_key": "coding", "property_label": "USP"},
+    "Carton USP": {"property_key": "carton_coding", "property_label": "USP"},
+    "Tube USP": {"property_key": "tube_coding", "property_label": "USP"},
     "Manufacturing Date": {"property_key": "coding", "property_label": "Manufacturing Date"},
+    "Carton Manufacturing Date": {"property_key": "carton_coding", "property_label": "Manufacturing Date"},
+    "Tube Manufacturing Date": {"property_key": "tube_coding", "property_label": "Manufacturing Date"},
     "Expiry Date": {"property_key": "coding", "property_label": "Expiry Date"},
     "Target Weight (g)": {"property_key": "target_weight", "property_label": "Weight"},
     "Tare Weight (g)": {"property_key": "target_weight", "property_label": "Weight"},
@@ -265,9 +278,9 @@ def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> Pipeli
 
 
 def create_general_properties_from_data(
-    data: Dict[str, Any],
-    pipeline_input: PipelineInput,
-    db: Session
+        data: Dict[str, Any],
+        pipeline_input: PipelineInput,
+        db: Session
 ) -> List[Dict[str, Any]]:
     """Create GeneralProperty records from remaining data fields"""
     properties_list: List[Dict[str, Any]] = []
@@ -354,8 +367,8 @@ async def get_form_fields(form_type: str, required: Optional[bool] = None):
 
 @router.post("/product")
 async def create_product_upload(
-    data: Dict[str, Any],
-    db: Session = Depends(get_db),
+        data: Dict[str, Any],
+        db: Session = Depends(get_db),
 ):
     """Single product upload with dynamic property creation"""
     try:
@@ -389,13 +402,13 @@ async def create_product_upload(
 
 @router.post("/product/bulk")
 async def create_bulk_product_upload(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+        file: UploadFile = File(...),
+        db: Session = Depends(get_db),
 ):
     """Bulk product upload with dynamic property creation from CSV"""
     try:
         contents = await file.read()
-        df = pd.read_csv(StringIO(contents.decode("utf-8")))
+        df = pd.read_csv(StringIO(contents.decode("utf-8")), dtype=str)
 
         # Handle unnamed columns by using first non-empty row as headers
         if all(col.startswith("Unnamed:") for col in df.columns):
@@ -411,7 +424,8 @@ async def create_bulk_product_upload(
             df = pd.read_csv(
                 StringIO(contents.decode("utf-8")),
                 skiprows=header_row_index + 1,
-                names=headers
+                names=headers,
+                dtype=str
             )
             # Clean the dataframe to remove any remaining empty rows
             df = df.dropna(how='all')
@@ -438,12 +452,9 @@ async def create_bulk_product_upload(
                         value: Any = row[col]
                         if pd.notna(value) and value != "" and str(value).strip() != "":
                             # Handle potential float conversion issues
-                            if isinstance(value, float):
-                                if not (value == float('inf') or value == float('-inf') or value != value):
-                                    row_data[col] = value
-                            else:
-                                row_data[col] = value
+                            row_data[col] = str(value)
 
+                    print(row_data)
                     # 1. Create/Get Pipeline Input
                     pipeline_input = create_pipeline_input_from_data(row_data, db)
 
@@ -531,9 +542,9 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
 
 @router.put("/product/{product_id}")
 async def update_product(
-    product_id: int,
-    data: Dict[str, Any],
-    db: Session = Depends(get_db),
+        product_id: int,
+        data: Dict[str, Any],
+        db: Session = Depends(get_db),
 ):
     """Update product with dynamic property handling"""
     try:
@@ -582,8 +593,8 @@ async def update_product(
 
 @router.delete("/product/{product_id}")
 async def delete_product(
-    product_id: int,
-    db: Session = Depends(get_db),
+        product_id: int,
+        db: Session = Depends(get_db),
 ):
     """Soft delete product and its properties"""
     try:
