@@ -1,6 +1,6 @@
 import time
 from io import StringIO
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -14,7 +14,7 @@ from app.models.pipeline_input import PipelineInput
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
 # Hardcoded mapping for column_name to property_key
-COLUMN_PROPERTY_MAPPING: Dict[str, str] = {
+COLUMN_PROPERTY_MAPPING: Dict[str, Union[str, Dict[str, str]]] = {
     "Machine Code-Front": {"property_key": "front", "property_label": "Front"},
     "Machine Code-Back": {"property_key": "back", "property_label": "Back"},
     "Material Code-Front": {"property_key": "material_code", "property_label": "Front"},
@@ -43,16 +43,16 @@ COLUMN_PROPERTY_MAPPING: Dict[str, str] = {
     "Product Name": {"property_key": "product_name", "property_label": "Product Name"},
     "Variant Barcode": {"property_key": "variant_barcode", "property_label": "Barcode"},
     "CLD Barcode": {"property_key": "cld_barcode", "property_label": "CLD Barcode"},
-    "Front Face": "front_face",
-    "Back Face": "back_face",
-    "Left Face": "left_face",
-    "Right Face": "right_face",
-    "Top Face": "top_face",
-    "Bottom Face": "bottom_face",
-    "Damage": "damage",
-    "Flap Open": "flap_open",
-    "Grease Dirt": "grease_dirt",
-    "Color Mismatch": "color_mismatch"
+    "Front Face": {"property_key": "front_face", "property_label": "Front Face"},
+    "Back Face": {"property_key": "back_face", "property_label": "Back Face"},
+    "Left Face": {"property_key": "left_face", "property_label": "Left Face"},
+    "Right Face": {"property_key": "right_face", "property_label": "Right Face"},
+    "Top Face": {"property_key": "top_face", "property_label": "Top Face"},
+    "Bottom Face": {"property_key": "bottom_face", "property_label": "Bottom Face"},
+    "Damage": {"property_key": "damage", "property_label": "Damage"},
+    "Flap Open": {"property_key": "flap_open", "property_label": "Flap Open"},
+    "Grease Dirt": {"property_key": "grease_dirt", "property_label": "Grease Dirt"},
+    "Color Mismatch": {"property_key": "color_mismatch", "property_label": "Color Mismatch"}
 }
 
 # Pipeline Input core fields that go directly to PipelineInput table
@@ -68,19 +68,25 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
         "description": "Form for creating/editing users",
         "fields": [
             {
-                "name": "First Name",
+                "name": "username",
+                "type": "text",
+                "required": True,
+                "property_type": "user_name"
+            },
+            {
+                "name": "firstName",
                 "type": "text",
                 "required": True,
                 "property_type": "first_name"
             },
             {
-                "name": "Last Name",
+                "name": "lastName",
                 "type": "text",
                 "required": True,
                 "property_type": "last_name"
             },
             {
-                "name": "Email Address",
+                "name": "email",
                 "type": "email",
                 "required": False,
                 "property_type": "email_address"
@@ -164,6 +170,12 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
                 "type": "text",
                 "required": True,
                 "property_type": "cld_barcode"
+            },
+            {
+                "name": "Product Type",
+                "type": "text",
+                "required": True,
+                "property_type": "product_type"
             },
             {
                 "name": "Variant Name",
@@ -262,18 +274,6 @@ FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
                 "property_type": "sachet_coding"
             },
             {
-                "name": "Perforation",
-                "type": "text",
-                "required": False,
-                "property_type": "physical_properties"
-            },
-            {
-                "name": "Other",
-                "type": "text",
-                "required": False,
-                "property_type": "additional_info"
-            },
-            {
                 "name": "Target Weight",
                 "type": "float",
                 "required": False,
@@ -328,8 +328,14 @@ def create_general_properties_from_data(
             continue
 
         # Get property_key from mapping, or empty string if not found
-        property_key: str = COLUMN_PROPERTY_MAPPING.get(column_name, {}).get("property_key", "")
-        property_label: str = COLUMN_PROPERTY_MAPPING.get(column_name, {}).get("property_label", "")
+        mapping_entry = COLUMN_PROPERTY_MAPPING.get(column_name, {})
+        if isinstance(mapping_entry, dict):
+            property_key: str = mapping_entry.get("property_key", "")
+            property_label: str = mapping_entry.get("property_label", "")
+        else:
+            # Handle legacy string entries (shouldn't happen now but for safety)
+            property_key = str(mapping_entry)
+            property_label = column_name
 
         # Create GeneralProperty record
         property_entity = GeneralProperty(
@@ -401,9 +407,9 @@ def create_machine_properties_from_data(
     for column_name, column_value in data.items():
         # Skip machine fields, empty values, and unnamed columns
         if (
-            column_name in MACHINE_FIELDS or 
-            column_value is None or 
-            column_value == "" or 
+            column_name in MACHINE_FIELDS or
+            column_value is None or
+            column_value == "" or
             column_name.strip().lower().startswith("unnamed:")
         ):
             continue
