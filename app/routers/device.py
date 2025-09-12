@@ -297,6 +297,7 @@ async def get_all_devices(
                     "id": device.id,
                     "name": device.name,
                     "created_at": device.created_at,
+                    "machine_type": device.machine_type,
                     "properties": properties,
                 }
             )

@@ -385,8 +385,13 @@ def create_machine_properties_from_data(
     timestamp = int(time.time())
 
     for column_name, column_value in data.items():
-        # Skip machine fields and empty values
-        if column_name in MACHINE_FIELDS or column_value is None or column_value == "":
+        # Skip machine fields, empty values, and unnamed columns
+        if (
+            column_name in MACHINE_FIELDS or 
+            column_value is None or 
+            column_value == "" or 
+            column_name.strip().lower().startswith("unnamed:")
+        ):
             continue
 
         # Convert column name to property_key (lowercase with underscores)
