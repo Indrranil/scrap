@@ -1,0 +1,146 @@
+{
+    "Machine Code-Front": {
+        "property_key": "front",
+        "property_label": "Front"
+    },
+    "Machine Code-Back": {
+        "property_key": "back",
+        "property_label": "Back"
+    },
+    "Material Code-Front": {
+        "property_key": "material_code",
+        "property_label": "Front"
+    },
+    "Material Code-Back": {
+        "property_key": "material_code",
+        "property_label": "Back"
+    },
+    "Primary Carton Material Code": {
+        "property_key": "primary_carton_material_code",
+        "property_label": "Primary Carton Material Code"
+    },
+    "Secondary Carton Material Code": {
+        "property_key": "secondary_carton_material_code",
+        "property_label": "Secondary Carton Material Code"
+    },
+    "Tube Material Code": {
+        "property_key": "tube_material_code",
+        "property_label": "Tube Material Code"
+    },
+    "Factory Code": {
+        "property_key": "coding",
+        "property_label": "Factory Code"
+    },
+    "Carton Factory Code": {
+        "property_key": "carton_coding",
+        "property_label": "Factory Code"
+    },
+    "Tube Factory Code": {
+        "property_key": "tube_coding",
+        "property_label": "Factory Code"
+    },
+    "Price": {
+        "property_key": "coding",
+        "property_label": "Price"
+    },
+    "Carton Price": {
+        "property_key": "carton_coding",
+        "property_label": "Price"
+    },
+    "Tube Price": {
+        "property_key": "tube_coding",
+        "property_label": "Price"
+    },
+    "USP": {
+        "property_key": "coding",
+        "property_label": "USP"
+    },
+    "Carton USP": {
+        "property_key": "carton_coding",
+        "property_label": "USP"
+    },
+    "Tube USP": {
+        "property_key": "tube_coding",
+        "property_label": "USP"
+    },
+    "Manufacturing Date": {
+        "property_key": "coding",
+        "property_label": "Manufacturing Date"
+    },
+    "Carton Manufacturing Date": {
+        "property_key": "carton_coding",
+        "property_label": "Manufacturing Date"
+    },
+    "Tube Manufacturing Date": {
+        "property_key": "tube_coding",
+        "property_label": "Manufacturing Date"
+    },
+    "Expiry Date": {
+        "property_key": "coding",
+        "property_label": "Expiry Date"
+    },
+    "Target Weight (g)": {
+        "property_key": "target_weight",
+        "property_label": "Weight"
+    },
+    "Tare Weight (g)": {
+        "property_key": "target_weight",
+        "property_label": "Weight"
+    },
+    "Form Factor": {
+        "property_key": "form_factor",
+        "property_label": "Form Factor"
+    },
+    "Product Name": {
+        "property_key": "product_name",
+        "property_label": "Product Name"
+    },
+    "Variant Barcode": {
+        "property_key": "variant_barcode",
+        "property_label": "Barcode"
+    },
+    "CLD Barcode": {
+        "property_key": "cld_barcode",
+        "property_label": "CLD Barcode"
+    },
+    "Front Face": {
+        "property_key": "front_face",
+        "property_label": "Front Face"
+    },
+    "Back Face": {
+        "property_key": "back_face",
+        "property_label": "Back Face"
+    },
+    "Left Face": {
+        "property_key": "left_face",
+        "property_label": "Left Face"
+    },
+    "Right Face": {
+        "property_key": "right_face",
+        "property_label": "Right Face"
+    },
+    "Top Face": {
+        "property_key": "top_face",
+        "property_label": "Top Face"
+    },
+    "Bottom Face": {
+        "property_key": "bottom_face",
+        "property_label": "Bottom Face"
+    },
+    "Damage": {
+        "property_key": "damage",
+        "property_label": "Damage"
+    },
+    "Flap Open": {
+        "property_key": "flap_open",
+        "property_label": "Flap Open"
+    },
+    "Grease Dirt": {
+        "property_key": "grease_dirt",
+        "property_label": "Grease Dirt"
+    },
+    "Color Mismatch": {
+        "property_key": "color_mismatch",
+        "property_label": "Color Mismatch"
+    }
+}

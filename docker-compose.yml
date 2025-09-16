@@ -32,7 +32,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     restart: always
     ports:
-      - "3308:3306"
+      - ${MYSQL_PORT:-3306}:3306
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -47,8 +47,8 @@ services:
     image: quay.io/keycloak/keycloak:latest
     environment:
       KC_DB: "mysql"
-      KC_DB_URL: "jdbc:mysql://mysql:3306/keycloak_db"
-      KC_DB_USERNAME: root
+      KC_DB_URL: ${KEYCLOAK_DB_URL:-jdbc:mysql://mysql:3306/keycloak_db}
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USERNAME}
       KC_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
@@ -60,7 +60,7 @@ services:
       - keycloak_data:/opt/keycloak/data
       - ./keycloak/import:/opt/keycloak/data/import
     ports:
-      - "8080:8080"
+      - ${KEYCLOAK_PORT:-8080}:8080
     networks:
       - polarisai-services-nw
     depends_on:

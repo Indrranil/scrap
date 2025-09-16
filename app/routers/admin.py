@@ -1,3 +1,5 @@
+import json
+import os
 import time
 from io import StringIO
 from typing import Any, Dict, List, Optional, Union
@@ -13,47 +15,24 @@ from app.models.pipeline_input import PipelineInput
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
-# Hardcoded mapping for column_name to property_key
-COLUMN_PROPERTY_MAPPING: Dict[str, Union[str, Dict[str, str]]] = {
-    "Machine Code-Front": {"property_key": "front", "property_label": "Front"},
-    "Machine Code-Back": {"property_key": "back", "property_label": "Back"},
-    "Material Code-Front": {"property_key": "material_code", "property_label": "Front"},
-    "Material Code-Back": {"property_key": "material_code", "property_label": "Back"},
-    "Primary Carton Material Code": {"property_key": "primary_carton_material_code",
-                                     "property_label": "Primary Carton Material Code"},
-    "Secondary Carton Material Code": {"property_key": "secondary_carton_material_code",
-                                       "property_label": "Secondary Carton Material Code"},
-    "Tube Material Code": {"property_key": "tube_material_code", "property_label": "Tube Material Code"},
-    "Factory Code": {"property_key": "coding", "property_label": "Factory Code"},
-    "Carton Factory Code": {"property_key": "carton_coding", "property_label": "Factory Code"},
-    "Tube Factory Code": {"property_key": "tube_coding", "property_label": "Factory Code"},
-    "Price": {"property_key": "coding", "property_label": "Price"},
-    "Carton Price": {"property_key": "carton_coding", "property_label": "Price"},
-    "Tube Price": {"property_key": "tube_coding", "property_label": "Price"},
-    "USP": {"property_key": "coding", "property_label": "USP"},
-    "Carton USP": {"property_key": "carton_coding", "property_label": "USP"},
-    "Tube USP": {"property_key": "tube_coding", "property_label": "USP"},
-    "Manufacturing Date": {"property_key": "coding", "property_label": "Manufacturing Date"},
-    "Carton Manufacturing Date": {"property_key": "carton_coding", "property_label": "Manufacturing Date"},
-    "Tube Manufacturing Date": {"property_key": "tube_coding", "property_label": "Manufacturing Date"},
-    "Expiry Date": {"property_key": "coding", "property_label": "Expiry Date"},
-    "Target Weight (g)": {"property_key": "target_weight", "property_label": "Weight"},
-    "Tare Weight (g)": {"property_key": "target_weight", "property_label": "Weight"},
-    "Form Factor": {"property_key": "form_factor", "property_label": "Form Factor"},
-    "Product Name": {"property_key": "product_name", "property_label": "Product Name"},
-    "Variant Barcode": {"property_key": "variant_barcode", "property_label": "Barcode"},
-    "CLD Barcode": {"property_key": "cld_barcode", "property_label": "CLD Barcode"},
-    "Front Face": {"property_key": "front_face", "property_label": "Front Face"},
-    "Back Face": {"property_key": "back_face", "property_label": "Back Face"},
-    "Left Face": {"property_key": "left_face", "property_label": "Left Face"},
-    "Right Face": {"property_key": "right_face", "property_label": "Right Face"},
-    "Top Face": {"property_key": "top_face", "property_label": "Top Face"},
-    "Bottom Face": {"property_key": "bottom_face", "property_label": "Bottom Face"},
-    "Damage": {"property_key": "damage", "property_label": "Damage"},
-    "Flap Open": {"property_key": "flap_open", "property_label": "Flap Open"},
-    "Grease Dirt": {"property_key": "grease_dirt", "property_label": "Grease Dirt"},
-    "Color Mismatch": {"property_key": "color_mismatch", "property_label": "Color Mismatch"}
-}
+
+# Load configuration from JSON files
+def load_json_config(filename: str) -> Dict[str, Any]:
+    """Load configuration from JSON file"""
+    # Get the app directory (parent of routers directory)
+    app_dir = os.path.dirname(os.path.dirname(__file__))
+    json_path = os.path.join(app_dir, "json", filename)
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail=f"Configuration file {filename} not found at {json_path}")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail=f"Invalid JSON in {filename}")
+
+
+# Load mappings from JSON files
+COLUMN_PROPERTY_MAPPING: Dict[str, Dict[str, str]] = load_json_config("column_property_mapping.json")
 
 # Pipeline Input core fields that go directly to PipelineInput table
 PIPELINE_INPUT_FIELDS: set[str] = {"Variant Name"}
@@ -61,227 +40,8 @@ PIPELINE_INPUT_FIELDS: set[str] = {"Variant Name"}
 # Machine core fields that go directly to Machine table
 MACHINE_FIELDS: set[str] = {"Name", "Machine Type"}
 
-# Form field configurations for different form types
-FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
-    "users": {
-        "name": "User Management Form",
-        "description": "Form for creating/editing users",
-        "fields": [
-            {
-                "name": "username",
-                "type": "text",
-                "required": True,
-                "property_type": "user_name"
-            },
-            {
-                "name": "firstName",
-                "type": "text",
-                "required": True,
-                "property_type": "first_name"
-            },
-            {
-                "name": "lastName",
-                "type": "text",
-                "required": True,
-                "property_type": "last_name"
-            },
-            {
-                "name": "email",
-                "type": "email",
-                "required": False,
-                "property_type": "email_address"
-            },
-            {
-                "name": "Role",
-                "type": "select",
-                "options": ["admin", "user"],
-                "required": False,
-                "property_type": "role"
-            },
-            {
-                "name": "Designation",
-                "type": "select",
-                "options": ["LQC", "SHIFT EXECUTIVE", "QUALITY EXECUTIVE"],
-                "required": False,
-                "property_type": "designation"
-            }
-        ]
-    },
-    "machines": {
-        "name": "Machine Configuration Form",
-        "description": "Form for setting up machines",
-        "fields": [
-            {
-                "name": "Name",
-                "type": "text",
-                "required": True,
-                "property_type": "name"
-            },
-            {
-                "name": "IP Address",
-                "type": "text",
-                "required": True,
-                "property_type": "ip_address"
-            },
-            {
-                "name": "MAC Address",
-                "type": "text",
-                "required": True,
-                "property_type": "mac_address"
-            },
-            {
-                "name": "Machine Type",
-                "type": "text",
-                "required": True,
-                "property_type": "machine_type"
-            },
-            {
-                "name": "Baud Rate",
-                "type": "number",
-                "required": True,
-                "property_type": "baud_rate"
-            },
-            {
-                "name": "Starting Address",
-                "type": "text",
-                "required": True,
-                "property_type": "starting_address"
-            },
-            {
-                "name": "Unit Name",
-                "type": "text",
-                "required": False,
-                "property_type": "unit_name"
-            },
-            {
-                "name": "Factory Name",
-                "type": "text",
-                "required": False,
-                "property_type": "factory_name"
-            }
-        ]
-    },
-    "product-carton": {
-        "name": "Carton Product Form",
-        "description": "Form for creating/editing carton products",
-        "fields": [
-            {
-                "name": "CLD Barcode",
-                "type": "text",
-                "required": True,
-                "property_type": "cld_barcode"
-            },
-            {
-                "name": "Product Type",
-                "type": "text",
-                "required": True,
-                "property_type": "product_type"
-            },
-            {
-                "name": "Variant Name",
-                "type": "text",
-                "required": True,
-                "property_type": "product_info"
-            },
-            {
-                "name": "Barcode",
-                "type": "text",
-                "required": True,
-                "property_type": "carton_coding"
-            },
-            {
-                "name": "Factory Code",
-                "type": "text",
-                "required": False,
-                "property_type": "carton_coding"
-            },
-            {
-                "name": "Price",
-                "type": "text",
-                "required": False,
-                "property_type": "carton_coding"
-            },
-            {
-                "name": "USP",
-                "type": "text",
-                "required": False,
-                "property_type": "carton_coding"
-            },
-            {
-                "name": "Manufacturing Date",
-                "type": "text",
-                "required": False,
-                "property_type": "carton_coding"
-            },
-            {
-                "name": "Factory Code Tube",
-                "type": "text",
-                "required": False,
-                "property_type": "tube_coding"
-            },
-            {
-                "name": "Manufacturing Date Tube",
-                "type": "text",
-                "required": False,
-                "property_type": "tube_coding"
-            },
-            {
-                "name": "Batch Code Tube",
-                "type": "text",
-                "required": False,
-                "property_type": "tube_coding"
-            },
-            {
-                "name": "Primary Carton Material Code",
-                "type": "text",
-                "required": False,
-                "property_type": "primary_carton_material_code"
-            },
-            {
-                "name": "Tube Material Code",
-                "type": "text",
-                "required": False,
-                "property_type": "tube_material_code"
-            },
-            {
-                "name": "Target Weight",
-                "type": "float",
-                "required": False,
-                "property_type": "target_weight"
-            }
-        ]
-    },
-    "product-sachet": {
-        "name": "Sachet Product Form",
-        "description": "Form for creating/editing sachet products",
-        "fields": [
-            {
-                "name": "CLD Barcode",
-                "type": "text",
-                "required": True,
-                "property_type": "sachet_coding"
-            },
-            {
-                "name": "Variant Name",
-                "type": "text",
-                "required": True,
-                "property_type": "product_info"
-            },
-            {
-                "name": "Variant Barcode",
-                "type": "text",
-                "required": True,
-                "property_type": "sachet_coding"
-            },
-            {
-                "name": "Target Weight",
-                "type": "float",
-                "required": False,
-                "property_type": "physical_properties"
-            }
-        ]
-    }
-}
+# Load form configurations from JSON file
+FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = load_json_config("form_configurations.json")
 
 
 def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> PipelineInput:
@@ -357,6 +117,64 @@ def create_general_properties_from_data(
             "property_value": property_entity.property_value,
             "created_at": property_entity.created_at,
         })
+
+    # Automatically add "others" property type for Color and Perfume
+    others_properties = [
+        {"property_label": "Color: Matches with the standard?", "property_value": "1"},
+        {"property_label": "Perfume: Matches with the standard?", "property_value": "1"}
+    ]
+
+    for others_prop in others_properties:
+        property_entity = GeneralProperty(
+            referrer_id=pipeline_input.id,
+            property_type="pipeline_input",
+            property_key="others",
+            property_label=others_prop["property_label"],
+            property_value=others_prop["property_value"],
+            created_at=timestamp,
+            is_usable=1,
+        )
+        db.add(property_entity)
+        db.flush()
+
+        properties_list.append({
+            "id": property_entity.id,
+            "property_label": property_entity.property_label,
+            "property_key": property_entity.property_key,
+            "property_value": property_entity.property_value,
+            "created_at": property_entity.created_at,
+        })
+
+    # Check if form_factor is Sachet and add perforation properties
+    form_factor_value = data.get("Form Factor", "")
+    if form_factor_value and form_factor_value.lower() == "sachet":
+        perforation_properties = [
+            {"property_label": "Min", "property_value": ""},
+            {"property_label": "Max", "property_value": ""},
+            {"property_label": "Avg", "property_value": ""},
+            {"property_label": "Raw", "property_value": ""}
+        ]
+
+        for perf_prop in perforation_properties:
+            property_entity = GeneralProperty(
+                referrer_id=pipeline_input.id,
+                property_type="pipeline_input",
+                property_key="perforation",
+                property_label=perf_prop["property_label"],
+                property_value=perf_prop["property_value"],
+                created_at=timestamp,
+                is_usable=1,
+            )
+            db.add(property_entity)
+            db.flush()
+
+            properties_list.append({
+                "id": property_entity.id,
+                "property_label": property_entity.property_label,
+                "property_key": property_entity.property_key,
+                "property_value": property_entity.property_value,
+                "created_at": property_entity.created_at,
+            })
 
     return properties_list
 
