@@ -176,6 +176,43 @@ def create_general_properties_from_data(
                 "created_at": property_entity.created_at,
             })
 
+    # Check if PQS Carton flag is set and add pqs_carton properties
+    pqs_carton_value = data.get("PQS Carton", "")
+    if pqs_carton_value == "1":
+        pqs_carton_properties = [
+            {"property_label": "Front Face", "property_key": "front_face"},
+            {"property_label": "Back Face", "property_key": "back_face"},
+            {"property_label": "Top Face", "property_key": "top_face"},
+            {"property_label": "Bottom Face", "property_key": "bottom_face"},
+            {"property_label": "Left Face", "property_key": "left_face"},
+            {"property_label": "Right Face", "property_key": "right_face"},
+            {"property_label": "Damage", "property_key": "damage"},
+            {"property_label": "Flap Open", "property_key": "flap_open"},
+            {"property_label": "Grease Dirt", "property_key": "grease_dirt"},
+            {"property_label": "Color Mismatch", "property_key": "color_mismatch"}
+        ]
+
+        for pqs_prop in pqs_carton_properties:
+            property_entity = GeneralProperty(
+                referrer_id=pipeline_input.id,
+                property_type="pqs_carton",
+                property_key=pqs_prop["property_key"],
+                property_label=pqs_prop["property_label"],
+                property_value="1",
+                created_at=timestamp,
+                is_usable=1,
+            )
+            db.add(property_entity)
+            db.flush()
+
+            properties_list.append({
+                "id": property_entity.id,
+                "property_label": property_entity.property_label,
+                "property_key": property_entity.property_key,
+                "property_value": property_entity.property_value,
+                "created_at": property_entity.created_at,
+            })
+
     return properties_list
 
 
