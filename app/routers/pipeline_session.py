@@ -179,7 +179,7 @@ async def get_all_pipeline_sessions(
             else:
                 sessions_arr[index]["pipeline_input"] = None
             # Get related outputs with eager loading
-            outputs = (
+            outputs_query = (
                 db.query(PipelineSessionOutput).outerjoin(PipelineSessionOutputUnit)
                 .filter(
                     PipelineSessionOutput.pipeline_session_id == session.id,
@@ -188,9 +188,9 @@ async def get_all_pipeline_sessions(
                 )
             )
             if verdict is not None:
-                outputs = outputs.filter(PipelineSessionOutputUnit.verdict == verdict)
+                outputs_query = outputs_query.filter(PipelineSessionOutputUnit.verdict == verdict)
 
-            outputs = outputs.order_by(PipelineSessionOutput.id.desc()).limit(15).all()
+            outputs = outputs_query.order_by(PipelineSessionOutput.id.desc()).limit(15).all()
             outputs_list = []
             for output in outputs:
                 output_dict = dict(vars(output))
