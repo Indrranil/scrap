@@ -75,23 +75,6 @@ async def get_all_pipeline_sessions(
             session_ids_list = [row[0] for row in status_session_ids]
             base_query = base_query.filter(PipelineSessionModel.id.in_(session_ids_list))
 
-        # Add verdict filter if provided - filter sessions by output unit verdict
-        if verdict is not None:
-            verdict_session_ids = (
-                db.query(PipelineSessionModel.id)
-                .join(PipelineSessionOutput, PipelineSessionModel.id == PipelineSessionOutput.pipeline_session_id)
-                .join(PipelineSessionOutputUnit, PipelineSessionOutput.id == PipelineSessionOutputUnit.pipeline_session_output_id)
-                .filter(
-                    PipelineSessionOutputUnit.verdict == verdict,
-                    PipelineSessionOutputUnit.is_usable == 1,
-                    PipelineSessionOutput.is_usable == 1,
-                )
-                .distinct()
-                .all()
-            )
-            session_ids_list = [row[0] for row in verdict_session_ids]
-            base_query = base_query.filter(PipelineSessionModel.id.in_(session_ids_list))
-
         # Add date range filters if provided
         if start_date is not None:
             base_query = base_query.filter(PipelineSessionModel.created_at >= start_date)
@@ -197,16 +180,17 @@ async def get_all_pipeline_sessions(
                 sessions_arr[index]["pipeline_input"] = None
             # Get related outputs with eager loading
             outputs = (
-                db.query(PipelineSessionOutput)
+                db.query(PipelineSessionOutput).outerjoin(PipelineSessionOutputUnit)
                 .filter(
                     PipelineSessionOutput.pipeline_session_id == session.id,
                     condition,
                     PipelineSessionOutput.is_usable == 1,
                 )
-                .order_by(PipelineSessionOutput.id.desc())
-                .limit(15)
-                .all()
             )
+            if verdict is not None:
+                outputs = outputs.filter(PipelineSessionOutputUnit.verdict == verdict)
+
+            outputs = outputs.order_by(PipelineSessionOutput.id.desc()).limit(15).all()
             outputs_list = []
             for output in outputs:
                 output_dict = dict(vars(output))
