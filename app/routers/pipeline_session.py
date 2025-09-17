@@ -38,6 +38,7 @@ async def get_all_pipeline_sessions(
         pipeline_id: int = Query(None, required=False),
         name: str = Query(None, required=False),
         status: bool = Query(None, required=False),
+        verdict: int = Query(None, required=False),
         start_date: int = Query(None, required=False),
         end_date: int = Query(None, required=False),
         filters: BasicFilter = Depends(),
@@ -72,6 +73,23 @@ async def get_all_pipeline_sessions(
                 .all()
             )
             session_ids_list = [row[0] for row in status_session_ids]
+            base_query = base_query.filter(PipelineSessionModel.id.in_(session_ids_list))
+
+        # Add verdict filter if provided - filter sessions by output unit verdict
+        if verdict is not None:
+            verdict_session_ids = (
+                db.query(PipelineSessionModel.id)
+                .join(PipelineSessionOutput, PipelineSessionModel.id == PipelineSessionOutput.pipeline_session_id)
+                .join(PipelineSessionOutputUnit, PipelineSessionOutput.id == PipelineSessionOutputUnit.pipeline_session_output_id)
+                .filter(
+                    PipelineSessionOutputUnit.verdict == verdict,
+                    PipelineSessionOutputUnit.is_usable == 1,
+                    PipelineSessionOutput.is_usable == 1,
+                )
+                .distinct()
+                .all()
+            )
+            session_ids_list = [row[0] for row in verdict_session_ids]
             base_query = base_query.filter(PipelineSessionModel.id.in_(session_ids_list))
 
         # Add date range filters if provided
