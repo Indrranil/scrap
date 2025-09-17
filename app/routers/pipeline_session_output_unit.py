@@ -7,6 +7,7 @@ from starlette import status
 
 from app.auth.auth import require_roles
 from app.database.connection import get_db
+from app.models.general_property import GeneralProperty
 from app.models.pipeline_session_output_unit import (
     PipelineSessionOutputUnit as PipelineSessionOutputUnitModel,
 )
@@ -22,6 +23,27 @@ from app.schemas.pipeline_session_output_unit import (
 router = APIRouter(
     prefix="/v1/pipeline-session-output-unit", tags=["pipeline-session-output-unit"]
 )
+
+
+def _compute_verdict(output_value: str, reference_property: GeneralProperty) -> Optional[int]:
+    """Compute verdict based on output value and reference property"""
+    if output_value is None:
+        return None
+
+    if reference_property.property_label == "Factory Code":
+        if output_value.lower().startswith("b"):
+            return 1
+    elif reference_property.property_label == "Weight":
+        try:
+            if float(output_value) > float(reference_property.property_value):
+                return 1
+        except ValueError:
+            # Log error if needed, but continue with default logic
+            pass
+    elif output_value == reference_property.property_value:
+        return 1
+
+    return 0
 
 
 @router.post("/new", response_model=PipelineSessionOutputUnit, status_code=201)
@@ -156,8 +178,27 @@ async def update_pipeline_session_output_unit(
                 detail=f"Pipeline session output unit with ID {unit_id} not found",
             )
 
-        # Update fields if provided
-        for key, value in unit_update.model_dump(exclude_unset=True).items():
+        update_data = unit_update.model_dump(exclude_unset=True)
+
+        # Check if output_value is in payload and verdict is not provided
+        if "output_value" in update_data and "verdict" not in update_data:
+            # Get the reference property to compute verdict
+            reference_property = (
+                db.query(GeneralProperty)
+                .filter(
+                    GeneralProperty.id == unit.property_reference_id,
+                    GeneralProperty.is_usable == 1,
+                )
+                .first()
+            )
+
+            if reference_property:
+                computed_verdict = _compute_verdict(update_data["output_value"], reference_property)
+                if computed_verdict is not None:
+                    update_data["verdict"] = computed_verdict
+
+        # Update fields
+        for key, value in update_data.items():
             setattr(unit, key, value)
 
         db.commit()
