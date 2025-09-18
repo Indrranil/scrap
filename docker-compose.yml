@@ -5,6 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile.api
     restart: always
+    volumes:
+      - images_data:/app/images
     ports:
       - ${API_PORT:-8000}:${API_PORT:-8000}
     networks:
@@ -76,6 +78,8 @@ volumes:
     name: polarisai_mysql_data
   keycloak_data:
     name: polarisai_keycloak_data
+  images_data:
+    name: polarisai_images_data
 
 networks:
   polarisai-services-nw:
