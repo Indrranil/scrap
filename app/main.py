@@ -88,7 +88,7 @@ async def broadcast_pub(websocket: WebSocket, topic: str, dt: str):
 
 
 @app.websocket("/sub/{topic}")
-async def broadcast_sub(websocket: WebSocket, topic: str):
+async def broadcast_sub(websocket: WebSocket, topic: str, keep_alive: bool = False):
     async def wrapper(data):
         if isinstance(data, str):
             await websocket.send_text(data)
@@ -96,7 +96,7 @@ async def broadcast_sub(websocket: WebSocket, topic: str):
             await websocket.send_bytes(data)
 
     await websocket.accept()
-    sub_status = broadcast_controller.subscribe(topic, wrapper)
+    sub_status = broadcast_controller.subscribe(topic, wrapper, keep_alive=keep_alive)
     if not sub_status:
         await websocket.close()
         return
@@ -134,11 +134,14 @@ async def websocket_post_endpoint(websocket: WebSocket, cam: str):
 
 
 @app.websocket("/frame/{cam}/get")
-async def websocket_get_endpoint(websocket: WebSocket, cam: str):
+async def websocket_get_endpoint(websocket: WebSocket, cam: str, keep_alive: bool = False):
     await websocket.accept()
     sid = str(uuid.uuid4())
-    s = output_stream_router.add_subscriber(sid, cam, websocket)
-    while s:
+    s = output_stream_router.add_subscriber(sid, cam, websocket, keep_alive=keep_alive)
+    if not s:
+        await websocket.close()
+        return
+    while True:
         try:
             await websocket.receive_text()
             time.sleep(0.02)
