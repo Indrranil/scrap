@@ -2,11 +2,11 @@ services:
   api:
     container_name: api
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ..
+      dockerfile: build_infra/Dockerfile.api
     restart: always
     volumes:
-      - ./app/images:/app/images
+      - ../app/images:/app/images
     ports:
       - ${API_PORT:-8000}:${API_PORT:-8000}
     networks:
@@ -23,7 +23,7 @@ services:
       timeout: 5s
       retries: 2
     env_file:
-      - ${ENV_FILE_PATH}
+      - ../.env
 
   mysql:
     build: .
@@ -34,7 +34,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     restart: always
     ports:
-      - "3308:3306"
+      - "3308:${MYSQL_PORT:-3306}"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -51,16 +51,16 @@ services:
       KC_DB: "mysql"
       KC_DB_URL: "jdbc:mysql://mysql:3306/keycloak_db"
       KC_DB_USERNAME: root
-      KC_DB_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB_PASSWORD: rootpass
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin_password
       KC_HOSTNAME_STRICT: "false"
       KC_HOSTNAME_STRICT_HTTPS: "false"
       KEYCLOAK_SCRIPT_UPLOAD: "true"
     restart: always
     volumes:
       - keycloak_data:/opt/keycloak/data
-      - ./keycloak/import:/opt/keycloak/data/import
+      - ../keycloak/import:/opt/keycloak/data/import
     ports:
       - "8080:8080"
     networks:

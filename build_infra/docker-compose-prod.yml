@@ -1,0 +1,58 @@
+services:
+  api:
+    container_name: api
+    build:
+      context: ..
+      dockerfile: build_infra/Dockerfile.api
+    restart: always
+    volumes:
+      - ../app/images:/app/images
+    ports:
+      - ${API_PORT:-8000}:${API_PORT:-8000}
+    networks:
+      - polarisai-services-nw
+    depends_on:
+      keycloak:
+        condition: service_started
+    healthcheck:
+      test: [ 'CMD', 'curl', '--silent', '--fail', '-X', 'GET', 'http://localhost:${API_PORT}/' ]
+      start_period: 10s
+      interval: 10s
+      timeout: 5s
+      retries: 2
+    env_file:
+      - ../.env
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:latest
+    environment:
+      KC_DB: "mysql"
+      KC_DB_URL: "jdbc:mysql://mysql:3306/keycloak_db"
+      KC_DB_USERNAME: root
+      KC_DB_PASSWORD: rootpass
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin_password
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KEYCLOAK_SCRIPT_UPLOAD: "true"
+    restart: always
+    volumes:
+      - keycloak_data:/opt/keycloak/data
+      - ../keycloak/import:/opt/keycloak/data/import
+    ports:
+      - "8080:8080"
+    networks:
+      - polarisai-services-nw
+    command: 
+      - start-dev
+      - --import-realm
+      - --verbose
+
+volumes:
+  keycloak_data:
+    name: polarisai_keycloak_data
+
+networks:
+  polarisai-services-nw:
+    name: polarisai-services-nw
+    external: true
