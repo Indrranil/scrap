@@ -1,3 +1,5 @@
+import json
+import os
 import time
 from io import StringIO
 from typing import Any, Dict, List, Optional, Union
@@ -8,231 +10,38 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.models.general_property import GeneralProperty
+from app.models.machine import Machine
 from app.models.pipeline_input import PipelineInput
 
 router = APIRouter(prefix="/v1/admin", tags=["admin"])
 
-# Hardcoded mapping for column_name to property_key
-COLUMN_PROPERTY_MAPPING: Dict[str, str] = {
-    "Machine Code-Front": "front",
-    "Machine Code-Back": "back",
-    "Material Code-Front": "material_front",
-    "Material Code-Back": "material_back",
-    "Factory Code": "factory_code",
-    "Price": "price",
-    "USP": "usp",
-    "Manufacturing Date": "manufacturing_date",
-    "Expiry Date": "expiry_date",
-    "Target Weight (g)": "target_weight",
-    "Tare Weight (g)": "tare_weight",
-    "Form Factor": "form_factor",
-    "Product Name": "product_name",
-    "Variant Barcode": "variant_barcode",
-    "CLD Barcode": "cld_barcode",
-    "Front Face": "front_face",
-    "Back Face": "back_face",
-    "Left Face": "left_face",
-    "Right Face": "right_face",
-    "Top Face": "top_face",
-    "Bottom Face": "bottom_face",
-    "Damage": "damage",
-    "Flap Open": "flap_open",
-    "Grease Dirt": "grease_dirt",
-    "Color Mismatch": "color_mismatch"
-}
+
+# Load configuration from JSON files
+def load_json_config(filename: str) -> Dict[str, Any]:
+    """Load configuration from JSON file"""
+    # Get the app directory (parent of routers directory)
+    app_dir = os.path.dirname(os.path.dirname(__file__))
+    json_path = os.path.join(app_dir, "json", filename)
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise HTTPException(status_code=500, detail=f"Configuration file {filename} not found at {json_path}")
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail=f"Invalid JSON in {filename}")
+
+
+# Load mappings from JSON files
+COLUMN_PROPERTY_MAPPING: Dict[str, Dict[str, str]] = load_json_config("column_property_mapping.json")
 
 # Pipeline Input core fields that go directly to PipelineInput table
 PIPELINE_INPUT_FIELDS: set[str] = {"Variant Name"}
 
-# Form field configurations for different form types
-FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = {
-    "users": {
-        "name": "User Management Form",
-        "description": "Form for creating/editing users",
-        "fields": [
-            {
-                "name": "First Name",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Last Name",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Email Address",
-                "type": "email",
-                "required": False
-            },
-            {
-                "name": "Role",
-                "type": "select",
-                "options": ["admin", "user"],
-                "required": False
-            },
-            {
-                "name": "Designation",
-                "type": "select",
-                "options": ["LQC", "SHIFT EXECUTIVE", "QUALITY EXECUTIVE"],
-                "required": False
-            }
-        ]
-    },
-    "machines": {
-        "name": "Machine Configuration Form",
-        "description": "Form for setting up machines",
-        "fields": [
-            {
-                "name": "Name",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "IP Address",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "MAC Address",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Machine Type",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Baud Rate",
-                "type": "number",
-                "required": True
-            },
-            {
-                "name": "Starting Address",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Unit Name",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Factory Name",
-                "type": "text",
-                "required": False
-            }
-        ]
-    },
-    "product-carton": {
-        "name": "Carton Product Form",
-        "description": "Form for creating/editing carton products",
-        "fields": [
-            {
-                "name": "CLD Barcode",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Variant Name",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Barcode",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Factory Code",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Price",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "USP",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Manufacturing Date",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Factory Code Tube",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Manufacturing Date Tube",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Batch Code Tube",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Primary Carton Material Code",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Tube Material Code",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Target Weight",
-                "type": "float",
-                "required": False
-            }
-        ]
-    },
-    "product-sachet": {
-        "name": "Sachet Product Form",
-        "description": "Form for creating/editing sachet products",
-        "fields": [
-            {
-                "name": "CLD Barcode",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Variant Name",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Variant Barcode",
-                "type": "text",
-                "required": True
-            },
-            {
-                "name": "Perforation",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Other",
-                "type": "text",
-                "required": False
-            },
-            {
-                "name": "Target Weight",
-                "type": "float",
-                "required": False
-            }
-        ]
-    }
-}
+# Machine core fields that go directly to Machine table
+MACHINE_FIELDS: set[str] = {"Name", "Machine Type"}
+
+# Load form configurations from JSON file
+FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = load_json_config("form_configurations.json")
 
 
 def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> PipelineInput:
@@ -265,9 +74,9 @@ def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> Pipeli
 
 
 def create_general_properties_from_data(
-    data: Dict[str, Any],
-    pipeline_input: PipelineInput,
-    db: Session
+        data: Dict[str, Any],
+        pipeline_input: PipelineInput,
+        db: Session
 ) -> List[Dict[str, Any]]:
     """Create GeneralProperty records from remaining data fields"""
     properties_list: List[Dict[str, Any]] = []
@@ -279,12 +88,235 @@ def create_general_properties_from_data(
             continue
 
         # Get property_key from mapping, or empty string if not found
-        property_key: str = COLUMN_PROPERTY_MAPPING.get(column_name, "")
+        mapping_entry = COLUMN_PROPERTY_MAPPING.get(column_name, {})
+        if isinstance(mapping_entry, dict):
+            property_key: str = mapping_entry.get("property_key", "")
+            property_label: str = mapping_entry.get("property_label", "")
+        else:
+            # Handle legacy string entries (shouldn't happen now but for safety)
+            property_key = str(mapping_entry)
+            property_label = column_name
 
         # Create GeneralProperty record
         property_entity = GeneralProperty(
             referrer_id=pipeline_input.id,
             property_type="pipeline_input",
+            property_key=property_key,
+            property_label=property_label,
+            property_value=str(column_value),
+            created_at=timestamp,
+            is_usable=1,
+        )
+        db.add(property_entity)
+        db.flush()
+
+        properties_list.append({
+            "id": property_entity.id,
+            "property_label": property_entity.property_label,
+            "property_key": property_entity.property_key,
+            "property_value": property_entity.property_value,
+            "created_at": property_entity.created_at,
+        })
+
+    # Automatically add "others" property type for Color and Perfume
+    others_properties = [
+        {"property_label": "Color: Matches with the standard?", "property_value": "1"},
+        {"property_label": "Perfume: Matches with the standard?", "property_value": "1"}
+    ]
+
+    for others_prop in others_properties:
+        property_entity = GeneralProperty(
+            referrer_id=pipeline_input.id,
+            property_type="pipeline_input",
+            property_key="others",
+            property_label=others_prop["property_label"],
+            property_value=others_prop["property_value"],
+            created_at=timestamp,
+            is_usable=1,
+        )
+        db.add(property_entity)
+        db.flush()
+
+        properties_list.append({
+            "id": property_entity.id,
+            "property_label": property_entity.property_label,
+            "property_key": property_entity.property_key,
+            "property_value": property_entity.property_value,
+            "created_at": property_entity.created_at,
+        })
+
+    # Check if form_factor is Sachet and add perforation properties
+    form_factor_value = data.get("Form Factor", "")
+    if form_factor_value and form_factor_value.lower() == "sachet":
+        perforation_properties = [
+            {"property_label": "Min", "property_value": ""},
+            {"property_label": "Max", "property_value": ""},
+            {"property_label": "Avg", "property_value": ""},
+            {"property_label": "Raw", "property_value": ""}
+        ]
+
+        for perf_prop in perforation_properties:
+            property_entity = GeneralProperty(
+                referrer_id=pipeline_input.id,
+                property_type="pipeline_input",
+                property_key="perforation",
+                property_label=perf_prop["property_label"],
+                property_value=perf_prop["property_value"],
+                created_at=timestamp,
+                is_usable=1,
+            )
+            db.add(property_entity)
+            db.flush()
+
+            properties_list.append({
+                "id": property_entity.id,
+                "property_label": property_entity.property_label,
+                "property_key": property_entity.property_key,
+                "property_value": property_entity.property_value,
+                "created_at": property_entity.created_at,
+            })
+
+    # Check if PQS Carton flag is set and add pqs_carton properties
+    pqs_carton_value = data.get("PQS Carton", "")
+    if pqs_carton_value == "1":
+        pqs_property_columns = [
+            "Front Face", "Back Face", "Top Face", "Bottom Face",
+            "Left Face", "Right Face", "Damage", "Flap Open",
+            "Grease Dirt", "Color Mismatch"
+        ]
+
+        for column_name in pqs_property_columns:
+            # Get property_key and property_label from mapping
+            mapping_entry = COLUMN_PROPERTY_MAPPING.get(column_name, {})
+            if isinstance(mapping_entry, dict):
+                property_key = mapping_entry.get("property_key", "")
+                property_label = mapping_entry.get("property_label", column_name)
+            else:
+                property_key = ""
+                property_label = column_name
+
+            property_entity = GeneralProperty(
+                referrer_id=pipeline_input.id,
+                property_type="pqs_carton",
+                property_key=property_key,
+                property_label=property_label,
+                property_value="1",
+                created_at=timestamp,
+                is_usable=1,
+            )
+            db.add(property_entity)
+            db.flush()
+
+            properties_list.append({
+                "id": property_entity.id,
+                "property_label": property_entity.property_label,
+                "property_key": property_entity.property_key,
+                "property_value": property_entity.property_value,
+                "created_at": property_entity.created_at,
+            })
+
+    # Check if PQS Tube flag is set and add pqs_tube properties
+    pqs_tube_value = data.get("PQS Tube", "")
+    if pqs_tube_value == "1":
+        pqs_property_columns = [
+            "Front Face", "Back Face", "Top Face", "Bottom Face",
+            "Left Face", "Right Face", "Damage", "Flap Open",
+            "Grease Dirt", "Color Mismatch"
+        ]
+
+        for column_name in pqs_property_columns:
+            # Get property_key and property_label from mapping
+            mapping_entry = COLUMN_PROPERTY_MAPPING.get(column_name, {})
+            if isinstance(mapping_entry, dict):
+                property_key = mapping_entry.get("property_key", "")
+                property_label = mapping_entry.get("property_label", column_name)
+            else:
+                property_key = ""
+                property_label = column_name
+
+            property_entity = GeneralProperty(
+                referrer_id=pipeline_input.id,
+                property_type="pqs_tube",
+                property_key=property_key,
+                property_label=property_label,
+                property_value="1",
+                created_at=timestamp,
+                is_usable=1,
+            )
+            db.add(property_entity)
+            db.flush()
+
+            properties_list.append({
+                "id": property_entity.id,
+                "property_label": property_entity.property_label,
+                "property_key": property_entity.property_key,
+                "property_value": property_entity.property_value,
+                "created_at": property_entity.created_at,
+            })
+
+    return properties_list
+
+
+def create_machine_from_data(data: Dict[str, Any], db: Session) -> Machine:
+    """Create or get existing Machine from data"""
+    machine_name = data.get("Name", "").strip()
+    machine_type = data.get("Machine Type", "").strip()
+
+    if not machine_name:
+        raise ValueError("Machine Name is required")
+    if not machine_type:
+        raise ValueError("Machine Type is required")
+
+    # Check if machine already exists
+    machine = (
+        db.query(Machine)
+        .filter(
+            Machine.name == machine_name,
+            Machine.machine_type == machine_type,
+            Machine.is_usable == 1,
+        )
+        .first()
+    )
+
+    if not machine:
+        machine = Machine(
+            name=machine_name,
+            machine_type=machine_type,
+            created_at=int(time.time()),
+            is_usable=1
+        )
+        db.add(machine)
+        db.flush()
+
+    return machine
+
+
+def create_machine_properties_from_data(
+    data: Dict[str, Any],
+    machine: Machine,
+    db: Session
+) -> List[Dict[str, Any]]:
+    """Create GeneralProperty records from machine data fields"""
+    properties_list: List[Dict[str, Any]] = []
+    timestamp = int(time.time())
+
+    for column_name, column_value in data.items():
+        # Skip machine fields, empty values, and unnamed columns
+        if (
+            column_name in MACHINE_FIELDS or
+            column_value is None or
+            column_value == "" or
+            column_name.strip().lower().startswith("unnamed:")
+        ):
+            continue
+
+        # Convert column name to property_key (lowercase with underscores)
+        property_key = column_name.lower().replace(" ", "_").replace("-", "_")
+
+        # Create GeneralProperty record
+        property_entity = GeneralProperty(
+            referrer_id=machine.id,
+            property_type="machine",
             property_key=property_key,
             property_label=column_name,
             property_value=str(column_value),
@@ -339,8 +371,8 @@ async def get_form_fields(form_type: str, required: Optional[bool] = None):
     if required is not None:
         fields = [field for field in fields if field.get("required", False) == required]
 
-    # Return only name and type for filtered fields
-    simplified_fields = [{"name": field["name"], "type": field["type"]} for field in fields]
+    # Return name, type, and property_type for filtered fields
+    simplified_fields = [{"name": field["name"], "type": field["type"], "property_type": field.get("property_type", "")} for field in fields]
 
     return {
         "form_type": form_type,
@@ -353,8 +385,8 @@ async def get_form_fields(form_type: str, required: Optional[bool] = None):
 
 @router.post("/product")
 async def create_product_upload(
-    data: Dict[str, Any],
-    db: Session = Depends(get_db),
+        data: Dict[str, Any],
+        db: Session = Depends(get_db),
 ):
     """Single product upload with dynamic property creation"""
     try:
@@ -388,13 +420,13 @@ async def create_product_upload(
 
 @router.post("/product/bulk")
 async def create_bulk_product_upload(
-    file: UploadFile = File(...),
-    db: Session = Depends(get_db),
+        file: UploadFile = File(...),
+        db: Session = Depends(get_db),
 ):
     """Bulk product upload with dynamic property creation from CSV"""
     try:
         contents = await file.read()
-        df = pd.read_csv(StringIO(contents.decode("utf-8")))
+        df = pd.read_csv(StringIO(contents.decode("utf-8")), dtype=str)
 
         # Handle unnamed columns by using first non-empty row as headers
         if all(col.startswith("Unnamed:") for col in df.columns):
@@ -410,7 +442,8 @@ async def create_bulk_product_upload(
             df = pd.read_csv(
                 StringIO(contents.decode("utf-8")),
                 skiprows=header_row_index + 1,
-                names=headers
+                names=headers,
+                dtype=str
             )
             # Clean the dataframe to remove any remaining empty rows
             df = df.dropna(how='all')
@@ -437,12 +470,9 @@ async def create_bulk_product_upload(
                         value: Any = row[col]
                         if pd.notna(value) and value != "" and str(value).strip() != "":
                             # Handle potential float conversion issues
-                            if isinstance(value, float):
-                                if not (value == float('inf') or value == float('-inf') or value != value):
-                                    row_data[col] = value
-                            else:
-                                row_data[col] = value
+                            row_data[col] = str(value)
 
+                    print(row_data)
                     # 1. Create/Get Pipeline Input
                     pipeline_input = create_pipeline_input_from_data(row_data, db)
 
@@ -481,6 +511,186 @@ async def create_bulk_product_upload(
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+@router.post("/machine/bulk")
+async def create_bulk_machine_upload(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+):
+    """Bulk machine upload with dynamic property creation from CSV"""
+    try:
+        contents = await file.read()
+        df = pd.read_csv(StringIO(contents.decode("utf-8")))
+
+        # Handle unnamed columns by using first non-empty row as headers
+        if all(col.startswith("Unnamed:") for col in df.columns):
+            # Find the first non-empty row to use as headers
+            header_row_index: int = 0
+            for i, row in df.iterrows():
+                if not all(pd.isna(val) or str(val).strip() == "" for val in row):
+                    header_row_index = i  # type: ignore
+                    break
+
+            headers = df.iloc[header_row_index].tolist()
+            # Skip empty rows and header row, start from data rows
+            df = pd.read_csv(
+                StringIO(contents.decode("utf-8")),
+                skiprows=header_row_index + 1,
+                names=headers
+            )
+            # Clean the dataframe to remove any remaining empty rows
+            df = df.dropna(how='all')
+        # For normal CSVs with proper headers, pandas handles it correctly
+
+        # Check required columns
+        required_columns = ["Name", "Machine Type"]
+        missing_columns = [col for col in required_columns if col not in df.columns]
+        if missing_columns:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Missing required columns: {', '.join(missing_columns)}",
+            )
+
+        successful_items: List[Dict[str, Any]] = []
+        failed_items: List[Dict[str, Any]] = []
+
+        for index, row in df.iterrows():
+            try:
+                with db.begin_nested():
+                    # Convert row to dictionary, handling NaN values
+                    row_data: Dict[str, Any] = {}
+                    for col in df.columns:
+                        value: Any = row[col]
+                        if pd.notna(value) and value != "" and str(value).strip() != "":
+                            # Handle potential float conversion issues
+                            if isinstance(value, float):
+                                if not (value == float('inf') or value == float('-inf') or value != value):
+                                    row_data[col] = value
+                            else:
+                                row_data[col] = value
+
+                    # 1. Create/Get Machine
+                    machine = create_machine_from_data(row_data, db)
+
+                    # 2. Create General Properties from remaining fields
+                    properties_list = create_machine_properties_from_data(
+                        row_data, machine, db
+                    )
+
+                    successful_items.append({
+                        "id": machine.id,
+                        "name": machine.name,
+                        "machine_type": machine.machine_type,
+                        "created_at": machine.created_at,
+                        "properties": properties_list,
+                    })
+
+            except Exception as e:
+                failed_items.append({
+                    "row": index + 2,  # type: ignore  # +2 because index starts at 0 and we skip header
+                    "machine_name": row.get("Name", "Unknown"),
+                    "error": str(e),
+                })
+                continue
+
+        if successful_items:
+            db.commit()
+
+        return {
+            "total": len(successful_items),
+            "items": successful_items,
+            "total_processed": len(df),
+            "successful": len(successful_items),
+            "failed": len(failed_items),
+            "failed_items": failed_items,
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Error processing file: {str(e)}")
+
+
+@router.post("/machine")
+async def create_machine_upload(
+    data: Dict[str, Any],
+    db: Session = Depends(get_db),
+):
+    """Single machine upload with dynamic property creation"""
+    try:
+        db.begin()
+
+        # 1. Create/Get Machine
+        machine = create_machine_from_data(data, db)
+
+        # 2. Create General Properties from remaining fields
+        properties_list = create_machine_properties_from_data(data, machine, db)
+
+        # Commit transaction
+        db.commit()
+
+        return {
+            "total": 1,
+            "items": [
+                {
+                    "id": machine.id,
+                    "name": machine.name,
+                    "machine_type": machine.machine_type,
+                    "created_at": machine.created_at,
+                    "properties": properties_list,
+                }
+            ],
+        }
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/machine/properties")
+async def get_all_machine_properties(db: Session = Depends(get_db)):
+    """Get all machines with their dynamic properties"""
+    try:
+        machines = db.query(Machine).filter(Machine.is_usable == 1).all()
+
+        items: List[Dict[str, Any]] = []
+        for machine in machines:
+            properties: List[Dict[str, Any]] = []
+
+            # Get all properties for this machine
+            machine_properties = (
+                db.query(GeneralProperty)
+                .filter(
+                    GeneralProperty.referrer_id == machine.id,
+                    GeneralProperty.property_type == "machine",
+                    GeneralProperty.is_usable == 1,
+                )
+                .all()
+            )
+
+            for prop in machine_properties:
+                properties.append({
+                    "id": prop.id,
+                    "property_label": prop.property_label,
+                    "property_key": prop.property_key,
+                    "property_value": prop.property_value,
+                    "created_at": prop.created_at,
+                })
+
+            items.append({
+                "id": machine.id,
+                "name": machine.name,
+                "machine_type": machine.machine_type,
+                "created_at": machine.created_at,
+                "properties": properties,
+            })
+
+        return {"total": len(items), "items": items}
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Error fetching machine properties: {str(e)}"
+        )
 
 
 @router.get("/product/properties")
@@ -530,9 +740,9 @@ async def get_all_product_properties(db: Session = Depends(get_db)):
 
 @router.put("/product/{product_id}")
 async def update_product(
-    product_id: int,
-    data: Dict[str, Any],
-    db: Session = Depends(get_db),
+        product_id: int,
+        data: Dict[str, Any],
+        db: Session = Depends(get_db),
 ):
     """Update product with dynamic property handling"""
     try:
@@ -581,8 +791,8 @@ async def update_product(
 
 @router.delete("/product/{product_id}")
 async def delete_product(
-    product_id: int,
-    db: Session = Depends(get_db),
+        product_id: int,
+        db: Session = Depends(get_db),
 ):
     """Soft delete product and its properties"""
     try:

@@ -1,0 +1,220 @@
+{
+    "users": {
+        "name": "User Management Form",
+        "description": "Form for creating/editing users",
+        "fields": [
+            {
+                "name": "username",
+                "type": "text",
+                "required": true,
+                "property_type": "user_name"
+            },
+            {
+                "name": "firstName",
+                "type": "text",
+                "required": true,
+                "property_type": "first_name"
+            },
+            {
+                "name": "lastName",
+                "type": "text",
+                "required": true,
+                "property_type": "last_name"
+            },
+            {
+                "name": "email",
+                "type": "email",
+                "required": false,
+                "property_type": "email_address"
+            },
+            {
+                "name": "Role",
+                "type": "select",
+                "options": ["admin", "user"],
+                "required": false,
+                "property_type": "role"
+            },
+            {
+                "name": "Designation",
+                "type": "select",
+                "options": ["LQC", "SHIFT EXECUTIVE", "QUALITY EXECUTIVE"],
+                "required": false,
+                "property_type": "designation"
+            }
+        ]
+    },
+    "machines": {
+        "name": "Machine Configuration Form",
+        "description": "Form for setting up machines",
+        "fields": [
+            {
+                "name": "Name",
+                "type": "text",
+                "required": true,
+                "property_type": "name"
+            },
+            {
+                "name": "IP Address",
+                "type": "text",
+                "required": true,
+                "property_type": "ip_address"
+            },
+            {
+                "name": "MAC Address",
+                "type": "text",
+                "required": true,
+                "property_type": "mac_address"
+            },
+            {
+                "name": "Machine Type",
+                "type": "text",
+                "required": true,
+                "property_type": "machine_type"
+            },
+            {
+                "name": "Baud Rate",
+                "type": "number",
+                "required": true,
+                "property_type": "baud_rate"
+            },
+            {
+                "name": "Starting Address",
+                "type": "text",
+                "required": true,
+                "property_type": "starting_address"
+            },
+            {
+                "name": "Unit Name",
+                "type": "text",
+                "required": false,
+                "property_type": "unit_name"
+            },
+            {
+                "name": "Factory Name",
+                "type": "text",
+                "required": false,
+                "property_type": "factory_name"
+            }
+        ]
+    },
+    "product-carton": {
+        "name": "Carton Product Form",
+        "description": "Form for creating/editing carton products",
+        "fields": [
+            {
+                "name": "CLD Barcode",
+                "type": "text",
+                "required": true,
+                "property_type": "cld_barcode"
+            },
+            {
+                "name": "Product Type",
+                "type": "text",
+                "required": true,
+                "property_type": "product_type"
+            },
+            {
+                "name": "Variant Name",
+                "type": "text",
+                "required": true,
+                "property_type": "product_info"
+            },
+            {
+                "name": "Barcode",
+                "type": "text",
+                "required": true,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Factory Code",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Price",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "USP",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Manufacturing Date",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Factory Code Tube",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Manufacturing Date Tube",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Batch Code Tube",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Primary Carton Material Code",
+                "type": "text",
+                "required": false,
+                "property_type": "primary_carton_material_code"
+            },
+            {
+                "name": "Tube Material Code",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_material_code"
+            },
+            {
+                "name": "Target Weight",
+                "type": "float",
+                "required": false,
+                "property_type": "target_weight"
+            }
+        ]
+    },
+    "product-sachet": {
+        "name": "Sachet Product Form",
+        "description": "Form for creating/editing sachet products",
+        "fields": [
+            {
+                "name": "CLD Barcode",
+                "type": "text",
+                "required": true,
+                "property_type": "sachet_coding"
+            },
+            {
+                "name": "Variant Name",
+                "type": "text",
+                "required": true,
+                "property_type": "product_info"
+            },
+            {
+                "name": "Variant Barcode",
+                "type": "text",
+                "required": true,
+                "property_type": "sachet_coding"
+            },
+            {
+                "name": "Target Weight",
+                "type": "float",
+                "required": false,
+                "property_type": "physical_properties"
+            }
+        ]
+    }
+}

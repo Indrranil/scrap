@@ -14,6 +14,7 @@ from app.routers.admin import router as admin_router
 from app.routers.application import router as application_router
 from app.routers.device import router as device_router
 from app.routers.general_property import router as property_router
+from app.routers.images import router as images_router
 from app.routers.pipeline import router as pipeline_router
 from app.routers.pipeline_input import router as pipeline_input_router
 from app.routers.pipeline_session import router as pipeline_session_router
@@ -45,6 +46,7 @@ app.add_middleware(AuthMiddleware)
 # Include routers
 app.include_router(application_router)
 app.include_router(device_router)
+app.include_router(images_router)
 app.include_router(pipeline_router)
 app.include_router(pipeline_session_router)
 app.include_router(pipeline_session_output_router)
@@ -86,7 +88,7 @@ async def broadcast_pub(websocket: WebSocket, topic: str, dt: str):
 
 
 @app.websocket("/sub/{topic}")
-async def broadcast_sub(websocket: WebSocket, topic: str):
+async def broadcast_sub(websocket: WebSocket, topic: str, keep_alive: bool = False):
     async def wrapper(data):
         if isinstance(data, str):
             await websocket.send_text(data)
@@ -94,7 +96,7 @@ async def broadcast_sub(websocket: WebSocket, topic: str):
             await websocket.send_bytes(data)
 
     await websocket.accept()
-    sub_status = broadcast_controller.subscribe(topic, wrapper)
+    sub_status = broadcast_controller.subscribe(topic, wrapper, keep_alive=keep_alive)
     if not sub_status:
         await websocket.close()
         return
@@ -132,11 +134,14 @@ async def websocket_post_endpoint(websocket: WebSocket, cam: str):
 
 
 @app.websocket("/frame/{cam}/get")
-async def websocket_get_endpoint(websocket: WebSocket, cam: str):
+async def websocket_get_endpoint(websocket: WebSocket, cam: str, keep_alive: bool = False):
     await websocket.accept()
     sid = str(uuid.uuid4())
-    s = output_stream_router.add_subscriber(sid, cam, websocket)
-    while s:
+    s = output_stream_router.add_subscriber(sid, cam, websocket, keep_alive=keep_alive)
+    if not s:
+        await websocket.close()
+        return
+    while True:
         try:
             await websocket.receive_text()
             time.sleep(0.02)
