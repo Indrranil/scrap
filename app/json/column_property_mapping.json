@@ -142,5 +142,13 @@
     "Color Mismatch": {
         "property_key": "color_mismatch",
         "property_label": "Color Mismatch"
+    },
+    "Min Weight": {
+        "property_key": "target_weight",
+        "property_label": "Min Weight"
+    },
+    "Max Weight": {
+        "property_key": "target_weight",
+        "property_label": "Max Weight"
     }
 }

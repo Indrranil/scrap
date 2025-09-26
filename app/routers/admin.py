@@ -44,31 +44,42 @@ MACHINE_FIELDS: set[str] = {"Name", "Machine Type"}
 FORM_CONFIGURATIONS: Dict[str, Dict[str, Any]] = load_json_config("form_configurations.json")
 
 
-def create_pipeline_input_from_data(data: Dict[str, Any], db: Session) -> PipelineInput:
-    """Create or get existing PipelineInput from data"""
-    variant_name = data.get("Variant Name", "").lower()
+def create_pipeline_input_from_data(data: Dict[str, Any], db: Session, allow_duplicates: bool = False) -> PipelineInput:
+    """Create new PipelineInput from data with duplicate prevention"""
+    variant_name = data.get("Variant Name", "").strip()
 
     if not variant_name:
         raise ValueError("Variant Name is required")
 
+    # Normalize variant name for comparison (case-insensitive)
+    variant_name_lower = variant_name.lower()
+
     # Check if pipeline input already exists
-    pipeline_input = (
+    existing_pipeline_input = (
         db.query(PipelineInput)
         .filter(
-            PipelineInput.name == variant_name,
+            PipelineInput.name == variant_name_lower,
             PipelineInput.is_usable == 1,
         )
         .first()
     )
 
-    if not pipeline_input:
-        pipeline_input = PipelineInput(
-            name=variant_name,
-            created_at=int(time.time()),
-            is_usable=1
-        )
-        db.add(pipeline_input)
-        db.flush()
+    if existing_pipeline_input:
+        if allow_duplicates:
+            # Return existing pipeline input (legacy behavior)
+            return existing_pipeline_input
+        else:
+            # Prevent duplicate - raise error
+            raise ValueError(f"Product with variant name '{variant_name}' already exists")
+
+    # Create new pipeline input
+    pipeline_input = PipelineInput(
+        name=variant_name_lower,
+        created_at=int(time.time()),
+        is_usable=1
+    )
+    db.add(pipeline_input)
+    db.flush()
 
     return pipeline_input
 
@@ -386,14 +397,15 @@ async def get_form_fields(form_type: str, required: Optional[bool] = None):
 @router.post("/product")
 async def create_product_upload(
         data: Dict[str, Any],
+        allow_duplicates: bool = False,
         db: Session = Depends(get_db),
 ):
-    """Single product upload with dynamic property creation"""
+    """Single product upload with dynamic property creation and duplicate prevention"""
     try:
         db.begin()
 
-        # 1. Create/Get Pipeline Input
-        pipeline_input = create_pipeline_input_from_data(data, db)
+        # 1. Create Pipeline Input (with duplicate prevention)
+        pipeline_input = create_pipeline_input_from_data(data, db, allow_duplicates=allow_duplicates)
 
         # 2. Create General Properties from remaining fields
         properties_list = create_general_properties_from_data(data, pipeline_input, db)
@@ -402,6 +414,8 @@ async def create_product_upload(
         db.commit()
 
         return {
+            "success": True,
+            "message": "Product created successfully",
             "total": 1,
             "items": [
                 {
@@ -413,6 +427,10 @@ async def create_product_upload(
             ],
         }
 
+    except ValueError as e:
+        db.rollback()
+        # Handle duplicate/validation errors with 400 status
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
@@ -421,6 +439,7 @@ async def create_product_upload(
 @router.post("/product/bulk")
 async def create_bulk_product_upload(
         file: UploadFile = File(...),
+        allow_duplicates: bool = False,
         db: Session = Depends(get_db),
 ):
     """Bulk product upload with dynamic property creation from CSV"""
@@ -473,8 +492,8 @@ async def create_bulk_product_upload(
                             row_data[col] = str(value)
 
                     print(row_data)
-                    # 1. Create/Get Pipeline Input
-                    pipeline_input = create_pipeline_input_from_data(row_data, db)
+                    # 1. Create Pipeline Input (with duplicate prevention)
+                    pipeline_input = create_pipeline_input_from_data(row_data, db, allow_duplicates=allow_duplicates)
 
                     # 2. Create General Properties from remaining fields
                     properties_list = create_general_properties_from_data(
