@@ -130,7 +130,8 @@ async def websocket_post_endpoint(websocket: WebSocket, cam: str):
             break
         except KeyboardInterrupt:
             break
-    output_stream_router.remove_cam(cam)
+    # Only clear publisher frames, keep subscribers alive for reconnection
+    output_stream_router.remove_publisher(cam)
 
 
 @app.websocket("/frame/{cam}/get")
