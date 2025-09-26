@@ -36,7 +36,7 @@ def _compute_verdict(output_value: str, reference_property: GeneralProperty, db:
     elif reference_property.property_label == "Weight":
         try:
             weight_value = float(output_value)
-            
+
             # Get min and max weight properties for the same referrer_id
             min_weight_property = (
                 db.query(GeneralProperty)
@@ -48,7 +48,7 @@ def _compute_verdict(output_value: str, reference_property: GeneralProperty, db:
                 )
                 .first()
             )
-            
+
             max_weight_property = (
                 db.query(GeneralProperty)
                 .filter(
@@ -59,13 +59,13 @@ def _compute_verdict(output_value: str, reference_property: GeneralProperty, db:
                 )
                 .first()
             )
-            
+
             # If both min and max weight are available, check range
             if min_weight_property and max_weight_property:
                 try:
                     min_weight = float(min_weight_property.property_value)
                     max_weight = float(max_weight_property.property_value)
-                    
+
                     # Weight should be between min and max (inclusive)
                     if min_weight <= weight_value <= max_weight:
                         return 1
@@ -74,11 +74,11 @@ def _compute_verdict(output_value: str, reference_property: GeneralProperty, db:
                 except ValueError:
                     # If min/max values are not valid numbers, fall back to old logic
                     pass
-            
+
             # Fallback to original logic if min/max not available or invalid
             if float(output_value) > float(reference_property.property_value):
                 return 1
-                
+
         except ValueError:
             # Log error if needed, but continue with default logic
             pass
