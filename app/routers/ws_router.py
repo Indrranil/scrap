@@ -71,8 +71,22 @@ class OutputStreamRouter:
         self._store_frame(cam, frame)
 
     def remove_cam(self, cam: str) -> None:
+        """Remove camera completely - only use when no keep-alive subscribers exist"""
         self._streamers.pop(cam, None)
         self._frames.pop(cam, None)
+        logger.info(f"Camera {cam} completely removed")
+
+    def remove_publisher(self, cam: str) -> None:
+        """Remove publisher but keep camera and subscribers if they exist"""
+        if cam in self._frames:
+            self._frames.pop(cam, None)
+            logger.info(f"Publisher frames cleared for camera {cam}, but keeping subscribers")
+        else:
+            logger.info(f"No frames to clear for camera {cam}")
+
+    def has_subscribers(self, cam: str) -> bool:
+        """Check if camera has any subscribers"""
+        return cam in self._streamers and len(self._streamers[cam]) > 0
 
     def add_subscriber(self, sid: str, cam: str, ws: WebSocket, keep_alive: bool = False) -> bool:
         """Add a subscriber to a camera stream.
@@ -113,6 +127,12 @@ class OutputStreamRouter:
             if sid in self._streamers[cam]:
                 self._streamers[cam].pop(sid)
                 logger.info(f"Subscriber {sid} removed from camera {cam}")
+
+                # If no subscribers left and no keep-alive, remove camera completely
+                if len(self._streamers[cam]) == 0:
+                    logger.info(f"No subscribers left for camera {cam}")
+                    if not self._keep_alive_enabled:
+                        self.remove_cam(cam)
 
     def _store_frame(self, cam: str, frame: str) -> None:
         self._frames[cam] = frame

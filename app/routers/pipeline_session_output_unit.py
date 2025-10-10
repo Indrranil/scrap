@@ -25,7 +25,7 @@ router = APIRouter(
 )
 
 
-def _compute_verdict(output_value: str, reference_property: GeneralProperty) -> Optional[int]:
+def _compute_verdict(output_value: str, reference_property: GeneralProperty, db: Session) -> Optional[int]:
     """Compute verdict based on output value and reference property"""
     if output_value is None:
         return None
@@ -35,8 +35,50 @@ def _compute_verdict(output_value: str, reference_property: GeneralProperty) -> 
             return 1
     elif reference_property.property_label == "Weight":
         try:
+            weight_value = float(output_value)
+
+            # Get min and max weight properties for the same referrer_id
+            min_weight_property = (
+                db.query(GeneralProperty)
+                .filter(
+                    GeneralProperty.referrer_id == reference_property.referrer_id,
+                    GeneralProperty.property_type == reference_property.property_type,
+                    GeneralProperty.property_label == "Min Weight",
+                    GeneralProperty.is_usable == 1,
+                )
+                .first()
+            )
+
+            max_weight_property = (
+                db.query(GeneralProperty)
+                .filter(
+                    GeneralProperty.referrer_id == reference_property.referrer_id,
+                    GeneralProperty.property_type == reference_property.property_type,
+                    GeneralProperty.property_label == "Max Weight",
+                    GeneralProperty.is_usable == 1,
+                )
+                .first()
+            )
+
+            # If both min and max weight are available, check range
+            if min_weight_property and max_weight_property:
+                try:
+                    min_weight = float(min_weight_property.property_value)
+                    max_weight = float(max_weight_property.property_value)
+
+                    # Weight should be between min and max (inclusive)
+                    if min_weight <= weight_value <= max_weight:
+                        return 1
+                    else:
+                        return 0
+                except ValueError:
+                    # If min/max values are not valid numbers, fall back to old logic
+                    pass
+
+            # Fallback to original logic if min/max not available or invalid
             if float(output_value) > float(reference_property.property_value):
                 return 1
+
         except ValueError:
             # Log error if needed, but continue with default logic
             pass
@@ -193,7 +235,7 @@ async def update_pipeline_session_output_unit(
             )
 
             if reference_property:
-                computed_verdict = _compute_verdict(update_data["output_value"], reference_property)
+                computed_verdict = _compute_verdict(update_data["output_value"], reference_property, db)
                 if computed_verdict is not None:
                     update_data["verdict"] = computed_verdict
 
