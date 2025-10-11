@@ -1,0 +1,15 @@
+export API_PORT=8000
+export MYSQL_ROOT_PASSWORD=your_strong_mysql_root_password
+export MYSQL_DATABASE=your_app_database
+export MYSQL_USER=your_app_user
+export MYSQL_PASSWORD=your_strong_user_password
+export MYSQL_HOST_PORT=3308 
+export MYSQL_PORT=3306     
+export KC_DB_USERNAME=root
+export KC_DB_PASSWORD=your_strong_mysql_root_password
+export KEYCLOAK_ADMIN=admin
+export KEYCLOAK_ADMIN_PASSWORD=your_strong_keycloak_admin_password
+export KC_HTTPS_KEY_STORE_PASSWORD=your_keystore_password
+export KEYCLOAK_HTTP_PORT=8080
+export KEYCLOAK_HTTPS_PORT=8443
+export KEYCLOAK_SSL_CERT=../keycloak/certs/keystore.p12
