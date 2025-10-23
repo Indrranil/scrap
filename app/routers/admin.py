@@ -2,7 +2,7 @@ import json
 import os
 import time
 from io import StringIO
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import pandas as pd
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -197,21 +197,12 @@ def create_general_properties_from_data(
         ]
 
         for column_name in pqs_property_columns:
-            # Get property_key and property_label from mapping
-            mapping_entry = COLUMN_PROPERTY_MAPPING.get(column_name, {})
-            if isinstance(mapping_entry, dict):
-                property_key = mapping_entry.get("property_key", "")
-                property_label = mapping_entry.get("property_label", column_name)
-            else:
-                property_key = ""
-                property_label = column_name
-
             property_entity = GeneralProperty(
                 referrer_id=pipeline_input.id,
-                property_type="pqs_carton",
-                property_key=property_key,
-                property_label=property_label,
-                property_value="1",
+                property_type="pipeline_input",
+                property_key="pqs_carton",
+                property_label=column_name,
+                property_value="1" if column_name.lower().endswith("face") else "",
                 created_at=timestamp,
                 is_usable=1,
             )
@@ -236,21 +227,12 @@ def create_general_properties_from_data(
         ]
 
         for column_name in pqs_property_columns:
-            # Get property_key and property_label from mapping
-            mapping_entry = COLUMN_PROPERTY_MAPPING.get(column_name, {})
-            if isinstance(mapping_entry, dict):
-                property_key = mapping_entry.get("property_key", "")
-                property_label = mapping_entry.get("property_label", column_name)
-            else:
-                property_key = ""
-                property_label = column_name
-
             property_entity = GeneralProperty(
                 referrer_id=pipeline_input.id,
-                property_type="pqs_tube",
-                property_key=property_key,
-                property_label=property_label,
-                property_value="1",
+                property_type="pipeline_input",
+                property_key="pqs_tube",
+                property_label=column_name,
+                property_value="1" if column_name.lower().endswith("face") else "",
                 created_at=timestamp,
                 is_usable=1,
             )
