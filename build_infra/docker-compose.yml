@@ -7,6 +7,13 @@ services:
     restart: always
     volumes:
       - ../app/images:/app/images
+    environment:
+      - API_PORT=${API_PORT}
+      - MYSQL_HOST=mysql
+      - MYSQL_USER=${MYSQL_USER}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+      - MYSQL_DATABASE=${MYSQL_DATABASE}
+      - MYSQL_PORT=${MYSQL_PORT}
     ports:
       - ${API_PORT:-8000}:${API_PORT:-8000}
     networks:
@@ -22,9 +29,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 2
-    env_file:
-      - ../.env
-
   mysql:
     build: .
     environment:
@@ -34,7 +38,7 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD}
     restart: always
     ports:
-      - "3308:${MYSQL_PORT:-3306}"
+      - "${MYSQL_HOST_PORT:-3308}:${MYSQL_PORT:-3306}"
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
@@ -50,19 +54,23 @@ services:
     environment:
       KC_DB: "mysql"
       KC_DB_URL: "jdbc:mysql://mysql:3306/keycloak_db"
-      KC_DB_USERNAME: root
-      KC_DB_PASSWORD: rootpass
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
       KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: admin_password
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "true"
       KEYCLOAK_SCRIPT_UPLOAD: "true"
+      KC_HTTPS_KEY_STORE_PASSWORD: ${KC_HTTPS_KEY_STORE_PASSWORD}
+      KC_HTTPS_KEY_STORE_FILE: opt/keycloak/conf/keystore.p12
     restart: always
     volumes:
       - keycloak_data:/opt/keycloak/data
       - ../keycloak/import:/opt/keycloak/data/import
+      - ${KEYCLOAK_SSL_CERT}:/opt/keycloak/conf/keystore.p12
     ports:
-      - "8080:8080"
+      - "${KEYCLOAK_HTTP_PORT}:${KEYCLOAK_HTTP_PORT}"
+      - "${KEYCLOAK_HTTPS_PORT}:${KEYCLOAK_HTTPS_PORT}"
     networks:
       - polarisai-services-nw
     depends_on:
@@ -72,12 +80,14 @@ services:
       - start-dev
       - --import-realm
       - --verbose
-
 volumes:
   mysql_data:
     name: polarisai_mysql_data
+    external: true
   keycloak_data:
     name: polarisai_keycloak_data
+    external: true
+      
 
 networks:
   polarisai-services-nw:

@@ -6,42 +6,64 @@ Backend services for PolarisAI using FastAPI, MySQL, and Keycloak.
 - Docker
 - Docker Compose
 
+## Creating SSL certificate for keycloak
+1. **create** keycloak folder. inside this folder **create** another folder as certs
+2. ```bash
+      keytool -genkeypair -alias keycloak \
+      -keyalg RSA -keysize 2048 \
+      -validity 365 -keystore keycloak/certs/keystore.p12 \
+      -storetype PKCS12 \
+      -dname "CN=localhost, OU=Development, O=MyOrg, L=MyCity, S=MyState, C=IN" \
+      -storepass your-keystore-password -keypass your-key-password
+   ```
+   Change this variable according to you needs.
+   **NOTE** remember your store pass, we will need to setup the variable in env.sh script.
+3. Mount your the folder inside the docker-compose file under keycloak volume. You need to set the relative path to certificate in env.sh file
+The variable name will be like this ```KEYCLOAK_SSL_CERT=../keycloak/certs/keystore.p12```
+4. Set this variable in env.sh file ``` KC_HTTPS_KEY_STORE_PASSWORD=rootpass```
+5. ensure this setting ```KC_HOSTNAME_STRICT_HTTPS`` is true to ensure it runs only on https in docker compose file.
+6. set port 8443 for https and 8080 for http in env.sh script 
+
 ## Setup
 
 1. Clone the repository
     ```bash
-    git clone -b girish https://github.com/prowiz-analytics/polarisai-app-api
+    git clone -b dev https://github.com/prowiz-analytics/polarisai-app-api
     ```
 
-2. Create `.env` file in the root directory
-    ```env
-    MYSQL_ROOT_PASSWORD=rootpass
-    MYSQL_DATABASE=app_db
-    MYSQL_HOST=mysql
-    MYSQL_PORT=3306
-    MYSQL_USER=app_user
-    MYSQL_PASSWORD=root
-    KEYCLOAK_ADMIN=admin
-    KEYCLOAK_ADMIN_PASSWORD=admin_password
-    KEYCLOAK_CLIENT_ID=api
-    KEYCLOAK_CLIENT_SECRET=will-come-from-keycloak
-    KEYCLOAK_URL=http://keycloak:8080
-    KEYCLOAK_REALM=app-realm
-    API_PORT=8000
-    ENV_FILE_PATH=../.env
-    ```
+2. Create `env.sh` file in the root directory
+    ```env.sh
+  export API_PORT=8000
+  export MYSQL_ROOT_PASSWORD=rootpass
+  export MYSQL_DATABASE=app_db
+  export MYSQL_USER=app_user
+  export MYSQL_PASSWORD=root
+  export MYSQL_HOST_PORT=3308
+  export MYSQL_PORT=3306
+  export KC_DB_USERNAME=root
+  export KC_DB_PASSWORD=rootpass
+  export KEYCLOAK_ADMIN_PASSWORD=admin_password
+  export KC_HTTPS_KEY_STORE_PASSWORD=rootpass
+  export KEYCLOAK_HTTP_PORT=8080  
+  export KEYCLOAK_HTTPS_PORT=8443
+  export KEYCLOAK_SSL_CERT=../keycloak/certs/keystore.p12
+  ```
 
-3. Run the API
-    ```bash
+3. Run the env.sh file 
+  ```bash
     cd build_infra
-    docker-compose --env-file ../.env up -d
+    source ../env.sh
     ```
 
+4. Run the API
+    ```bash
+    docker-compose up -d
+    ```
 ## Keycloak Setup
 
 After the services are running, you need to configure Keycloak:
 
-1. **Create Realm**: Go to http://localhost:8080, create a realm named "app-realm" & select it
+1. **Create Realm**: Go to http://localhost:8080,or https://localhost:8443 if using SSL certificate. create a realm named "app-realm" & select it
 2. **Create Client**: Create a client named "api", enable all authentication & authorization flows. Select the created client, choose "credentials", copy client secret (for API env)
 3. **Create User**: Create a user with username "tester", email "tester@email.com", enter both first and last name, mark email as verified
 4. **Set Password**: Create a password for that user, uncheck temporary password
@@ -53,7 +75,7 @@ After setup, you can access the API using the test user.
 
 ### Service URLs
 - FastAPI: http://localhost:8000
-- Keycloak: http://localhost:8080
+- Keycloak: http://localhost:8080 / https://localhost:8443
 - MySQL: localhost:3308
 
 ## Docker Operations
