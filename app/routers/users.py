@@ -176,10 +176,10 @@ async def get_all_users():
 async def get_available_roles(_: bool = Depends(require_roles(["app_admin"]))):
     """
     Get all available roles from the app-realm in Keycloak.
-    
+
     Access Requirements:
     - User must have 'app_admin' role
-    
+
     Returns:
     - List of all available roles with their details from app-realm
     """
@@ -187,13 +187,13 @@ async def get_available_roles(_: bool = Depends(require_roles(["app_admin"]))):
         # Ensure we're working with the app-realm
         original_realm = keycloak_admin.realm_name
         keycloak_admin.realm_name = "app-realm"
-        
+
         # Get all realm roles from the app-realm
         roles = keycloak_admin.get_realm_roles()
-        
+
         # Restore original realm
         keycloak_admin.realm_name = original_realm
-        
+
         # Format roles according to response model
         formatted_roles = [
             RoleResponse(
@@ -203,12 +203,12 @@ async def get_available_roles(_: bool = Depends(require_roles(["app_admin"]))):
             )
             for role in roles
         ]
-        
+
         return RolesListResponse(
             total=len(formatted_roles),
             roles=formatted_roles
         )
-        
+
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to retrieve roles from app-realm: {str(e)}")
 
@@ -380,5 +380,3 @@ async def delete_user_by_username(username: str):
         raise he
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-
