@@ -26,7 +26,7 @@ keycloak_admin = KeycloakAdmin(
     server_url=getenv("KEYCLOAK_URL"),
     username=getenv("KEYCLOAK_ADMIN"),
     password=getenv("KEYCLOAK_ADMIN_PASSWORD"),
-    realm_name="app-realm",
+    realm_name=getenv("KEYCLOAK_REALM") or "app-realm",
     verify=True,
 )
 
@@ -184,15 +184,8 @@ async def get_available_roles(_: bool = Depends(require_roles(["app_admin"]))):
     - List of all available roles with their details from app-realm
     """
     try:
-        # Ensure we're working with the app-realm
-        original_realm = keycloak_admin.realm_name
-        keycloak_admin.realm_name = "app-realm"
-
-        # Get all realm roles from the app-realm
+        # Get all realm roles from the app-realm (already configured in keycloak_admin)
         roles = keycloak_admin.get_realm_roles()
-
-        # Restore original realm
-        keycloak_admin.realm_name = original_realm
 
         # Format roles according to response model
         formatted_roles = [
