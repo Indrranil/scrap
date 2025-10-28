@@ -33,3 +33,14 @@ class UserUpdate(BaseModel):
     lastName: Optional[str] = None
     password: Optional[str] = None
     roles: Optional[List[str]] = None
+
+
+class RoleResponse(BaseModel):
+    id: str
+    name: str
+    description: Optional[str] = None
+
+
+class RolesListResponse(BaseModel):
+    total: int
+    roles: List[RoleResponse]
