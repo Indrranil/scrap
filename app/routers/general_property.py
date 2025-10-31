@@ -39,7 +39,7 @@ async def get_all_properties(
         properties_subquery = (
             db.query(
                 GeneralProperty.property_label,
-                func.min(GeneralProperty.id).label("min_id"),
+                func.max(GeneralProperty.id).label("max_id"),
             )
             .filter(*base_filters)
             .group_by(GeneralProperty.property_label)
@@ -49,7 +49,7 @@ async def get_all_properties(
         properties = (
             db.query(GeneralProperty)
             .join(
-                properties_subquery, GeneralProperty.id == properties_subquery.c.min_id
+                properties_subquery, GeneralProperty.id == properties_subquery.c.max_id
             )
             .all()
         )

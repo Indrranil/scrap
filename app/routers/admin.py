@@ -193,7 +193,7 @@ def create_general_properties_from_data(
         pqs_property_columns = [
             "Front Face", "Back Face", "Top Face", "Bottom Face",
             "Left Face", "Right Face", "Damage", "Flap Open",
-            "Grease Dirt", "Color Mismatch"
+            "Grease/Dirt", "Color Mismatch"
         ]
 
         for column_name in pqs_property_columns:
@@ -221,9 +221,8 @@ def create_general_properties_from_data(
     pqs_tube_value = data.get("PQS Tube", "")
     if pqs_tube_value == "1":
         pqs_property_columns = [
-            "Front Face", "Back Face", "Top Face", "Bottom Face",
-            "Left Face", "Right Face", "Damage", "Flap Open",
-            "Grease Dirt", "Color Mismatch"
+            "Front Face", "Back Face", "Damage", "Misaligned Cap",
+            "Grease/Dirt", "Color Mismatch", "Loose Cap", "Off Center"
         ]
 
         for column_name in pqs_property_columns:

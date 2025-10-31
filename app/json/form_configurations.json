@@ -1,4 +1,214 @@
 {
+    "form-type-1-norden": {
+        "name": "Form Type 1 - Norden",
+        "description": "Form Type 1 for Norden variant products",
+        "fields": [
+            {
+                "name": "Variant Name",
+                "type": "text",
+                "required": true,
+                "property_type": "product_info"
+            },
+            {
+                "name": "Product Barcode",
+                "type": "text",
+                "required": true,
+                "property_type": "variant_barcode"
+            },
+            {
+                "name": "Material Code-Front",
+                "type": "text",
+                "required": false,
+                "property_type": "material_code"
+            },
+            {
+                "name": "Material Code-Back",
+                "type": "text",
+                "required": false,
+                "property_type": "material_code"
+            },
+            {
+                "name": "Factory Code",
+                "type": "text",
+                "required": false,
+                "property_type": "coding"
+            },
+            {
+                "name": "Price",
+                "type": "text",
+                "required": false,
+                "property_type": "coding"
+            },
+            {
+                "name": "USP",
+                "type": "text",
+                "required": false,
+                "property_type": "coding"
+            },
+            {
+                "name": "Manufacturing Date",
+                "type": "text",
+                "required": false,
+                "property_type": "coding"
+            },
+            {
+                "name": "PQS Carton",
+                "type": "checkbox",
+                "required": false,
+                "property_type": "pqs_flag"
+            },
+            {
+                "name": "PQS Tube",
+                "type": "checkbox",
+                "required": false,
+                "property_type": "pqs_flag"
+            }
+        ]
+    },
+    "form-type-1-sachet": {
+        "name": "Form Type 1 - Sachet",
+        "description": "Form Type 1 for Sachet variant products",
+        "fields": [
+            {
+                "name": "Variant Name",
+                "type": "text",
+                "required": true,
+                "property_type": "product_info"
+            },
+            {
+                "name": "Product Barcode",
+                "type": "text",
+                "required": true,
+                "property_type": "variant_barcode"
+            },
+            {
+                "name": "Target Weight (g)",
+                "type": "float",
+                "required": false,
+                "property_type": "target_weight"
+            },
+            {
+                "name": "Perforation Min",
+                "type": "float",
+                "required": false,
+                "property_type": "perforation"
+            },
+            {
+                "name": "Perforation Max",
+                "type": "float",
+                "required": false,
+                "property_type": "perforation"
+            },
+            {
+                "name": "Perforation Avg",
+                "type": "float",
+                "required": false,
+                "property_type": "perforation"
+            },
+            {
+                "name": "Perforation Raw",
+                "type": "text",
+                "required": false,
+                "property_type": "perforation"
+            }
+        ]
+    },
+    "form-type-2-norden": {
+        "name": "Form Type 2 - Norden",
+        "description": "Form Type 2 for Norden variant products (Sachet not available)",
+        "fields": [
+            {
+                "name": "Variant Name",
+                "type": "text",
+                "required": true,
+                "property_type": "product_info"
+            },
+            {
+                "name": "Product Barcode",
+                "type": "text",
+                "required": true,
+                "property_type": "variant_barcode"
+            },
+            {
+                "name": "Primary Carton Material Code",
+                "type": "text",
+                "required": false,
+                "property_type": "primary_carton_material_code"
+            },
+            {
+                "name": "Secondary Carton Material Code",
+                "type": "text",
+                "required": false,
+                "property_type": "secondary_carton_material_code"
+            },
+            {
+                "name": "Tube Material Code",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_material_code"
+            },
+            {
+                "name": "Carton Factory Code",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Carton Price",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Carton USP",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Carton Manufacturing Date",
+                "type": "text",
+                "required": false,
+                "property_type": "carton_coding"
+            },
+            {
+                "name": "Tube Factory Code",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Tube Price",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Tube USP",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Tube Manufacturing Date",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Tube Batch Code",
+                "type": "text",
+                "required": false,
+                "property_type": "tube_coding"
+            },
+            {
+                "name": "Target Weight (g)",
+                "type": "float",
+                "required": false,
+                "property_type": "target_weight"
+            }
+        ]
+    },
     "users": {
         "name": "User Management Form",
         "description": "Form for creating/editing users",
