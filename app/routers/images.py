@@ -10,7 +10,7 @@ router = APIRouter(prefix="/v1/images", tags=["images"])
 IMAGES_BASE_DIR = Path("/app/images")
 
 # Valid image file extensions
-VALID_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.ico'}
+VALID_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.ico', '.mp4', '.avi'}
 
 
 @router.get("/")
