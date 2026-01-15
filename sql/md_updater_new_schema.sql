@@ -2,7 +2,7 @@
 -- This is the new schema version for general_property table
 
 DELIMITER //
-CREATE PROCEDURE update_manufacturing_date()
+CREATE PROCEDURE update_tube_manufacturing_date()
 BEGIN
   DECLARE current_month VARCHAR(5);
   SET current_month = DATE_FORMAT(NOW(), '%m/%y');
@@ -13,7 +13,7 @@ BEGIN
   SELECT 
     gp.referrer_id,
     'pipeline_input' as property_type,
-    'coding' as property_key,
+    'tube_coding' as property_key,
     'Manufacturing Date' as property_label,
     current_month as property_value,
     UNIX_TIMESTAMP() as created_at,
@@ -23,6 +23,7 @@ BEGIN
     FROM general_property
     WHERE property_type = 'pipeline_input' 
     AND property_label = 'Manufacturing Date'
+    AND property_key = 'coding'
     AND is_usable = 1
     GROUP BY referrer_id
   ) AS latest_rows

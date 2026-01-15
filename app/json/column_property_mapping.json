@@ -75,6 +75,10 @@
         "property_key": "tube_coding",
         "property_label": "Manufacturing Date"
     },
+    "Carton Expiry Date": {
+        "property_key": "carton_coding",
+        "property_label": "Expiry Date"
+    },
     "Expiry Date": {
         "property_key": "coding",
         "property_label": "Expiry Date"
@@ -96,7 +100,7 @@
         "property_label": "Product Name"
     },
     "Variant Barcode": {
-        "property_key": "barcode",
+        "property_key": "variant_barcode",
         "property_label": "Barcode"
     },
     "CLD Barcode": {
@@ -150,5 +154,13 @@
     "Max Weight": {
         "property_key": "target_weight",
         "property_label": "Max Weight"
+    },
+     "CBU Code": {
+        "property_key": "cbu_code",
+        "property_label": "CBU Code"
+    },
+    "Carton Material Code": {
+        "property_key": "carton_material_code",
+        "property_label": "Carton Material Code"
     }
 }
