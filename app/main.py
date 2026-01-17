@@ -71,14 +71,12 @@ def is_running():
 
 
 @app.websocket("/pub/{topic}")
-async def broadcast_pub(websocket: WebSocket, topic: str, dt: str):
+async def broadcast_pub(websocket: WebSocket, topic: str):
     await websocket.accept()
     while True:
         try:
             f = (
                 await websocket.receive_text()
-                if dt == "str"
-                else await websocket.receive_bytes()
             )
             broadcast_controller.publish(topic, f)
             time.sleep(0.02)
@@ -94,7 +92,9 @@ async def broadcast_sub(websocket: WebSocket, topic: str, keep_alive: bool = Fal
     async def wrapper(data):
         if isinstance(data, str):
             await websocket.send_text(data)
-        if isinstance(data, bytes):
+        if isinstance(data, dict):
+            await websocket.send_json(data)
+        elif isinstance(data, bytes):
             await websocket.send_bytes(data)
 
     await websocket.accept()
