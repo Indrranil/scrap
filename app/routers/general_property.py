@@ -19,6 +19,7 @@ router = APIRouter(prefix="/v1/general-property", tags=["General Property"])
 async def get_all_properties(
     property_type: Optional[str] = "%",
     property_key: Optional[str] = "%",
+    property_label: Optional[str] = "%",
     property_value: Optional[str] = "%",
     referrer_id: Optional[int] = None,
     db: Session = Depends(get_db),
@@ -28,6 +29,7 @@ async def get_all_properties(
         base_filters = [
             GeneralProperty.property_key.like(property_key),
             GeneralProperty.property_type.like(property_type),
+            GeneralProperty.property_type.like(property_label),
             GeneralProperty.property_value.like(property_value),
             GeneralProperty.is_usable == 1,
         ]
