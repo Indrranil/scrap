@@ -9,7 +9,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from app.auth.auth import AuthMiddleware
 from app.database.connection import Base, engine
 from app.routers.admin import router as admin_router
-
+from app.routers.analytics import router as analytics_router
 # Import routers
 from app.routers.application import router as application_router
 from app.routers.device import router as device_router
@@ -26,7 +26,6 @@ from app.routers.product import router as product_router
 from app.routers.signin import router as signin_router
 from app.routers.users import router as user_router
 from app.routers.ws_router import broadcast_controller, output_stream_router
-from app.routers.analytics import router as analytics_router
 
 # ... other router imports ...
 
@@ -75,13 +74,20 @@ async def broadcast_pub(websocket: WebSocket, topic: str):
     await websocket.accept()
     while True:
         try:
-            f = (
-                await websocket.receive_text()
-            )
-            broadcast_controller.publish(topic, f)
+            f = None
+            message = await websocket.receive()
+            if "text" in message:
+                f = message.get("text")
+            elif "bytes" in message:
+                f = message.get("bytes")
+            if f is not None:
+                broadcast_controller.publish(topic, f)
             time.sleep(0.02)
         except WebSocketDisconnect:
             print("Websocket disconnected :)")
+            break
+        except RuntimeError:
+            print("Websocket disconnected early:)")
             break
         except KeyboardInterrupt:
             break
