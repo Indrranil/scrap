@@ -29,7 +29,7 @@ async def get_all_properties(
         base_filters = [
             GeneralProperty.property_key.like(property_key),
             GeneralProperty.property_type.like(property_type),
-            GeneralProperty.property_type.like(property_label),
+            GeneralProperty.property_label.like(property_label),
             GeneralProperty.property_value.like(property_value),
             GeneralProperty.is_usable == 1,
         ]
