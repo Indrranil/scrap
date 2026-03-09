@@ -181,6 +181,7 @@ async def get_all_pipeline_sessions(
             # Get related outputs with eager loading
             outputs_query = (
                 db.query(PipelineSessionOutput)
+                .join(PipelineSessionOutputUnit, PipelineSessionOutputUnit.pipeline_session_output_id == PipelineSessionOutput.id)
                 .filter(
                     PipelineSessionOutput.pipeline_session_id == session.id,
                     condition,
