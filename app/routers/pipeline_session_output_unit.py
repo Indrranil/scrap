@@ -16,7 +16,6 @@ from app.schemas.pipeline_session_output_unit import (
     BatchUpdateResponse,
     PipelineSessionOutputUnit,
     PipelineSessionOutputUnitCreate,
-    PipelineSessionOutputUnitResponse,
     PipelineSessionOutputUnitUpdate,
 )
 
@@ -33,7 +32,7 @@ def _compute_verdict(output_value: str, reference_property: GeneralProperty, db:
     if reference_property.property_label == "Factory Code":
         if output_value.lower().startswith("b"):
             return 1
-    elif reference_property.property_label == "Weight":
+    elif reference_property.property_label in ("Weight", "Min Weight", "Max Weight"):
         try:
             weight_value = float(output_value)
 
