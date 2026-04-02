@@ -364,7 +364,7 @@ async def get_form_fields(form_type: str, required: Optional[bool] = None):
         fields = [field for field in fields if field.get("required", False) == required]
 
     # Return name, type, and property_type for filtered fields
-    simplified_fields = [{"name": field["name"], "type": field["type"], "property_type": field.get("property_type", "")} for field in fields]
+    simplified_fields = [{"name": field["name"], "type": field["type"], "property_type": field.get("property_type", ""), "options": field.get("options", "")} for field in fields]
 
     return {
         "form_type": form_type,
