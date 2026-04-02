@@ -13,7 +13,7 @@
                 "name": "Product Barcode",
                 "type": "text",
                 "required": true,
-                "property_type": "variant_barcode"
+                "property_type": "barcode"
             },
             {
                 "name": "Material Code-Front",
@@ -79,7 +79,7 @@
                 "name": "Product Barcode",
                 "type": "text",
                 "required": true,
-                "property_type": "variant_barcode"
+                "property_type": "barcode"
             },
             {
                 "name": "Target Weight (g)",
@@ -127,7 +127,7 @@
                 "name": "Product Barcode",
                 "type": "text",
                 "required": true,
-                "property_type": "variant_barcode"
+                "property_type": "barcode"
             },
             {
                 "name": "Primary Carton Material Code",

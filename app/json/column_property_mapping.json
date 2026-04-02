@@ -100,7 +100,7 @@
         "property_label": "Product Name"
     },
     "Variant Barcode": {
-        "property_key": "variant_barcode",
+        "property_key": "barcode",
         "property_label": "Barcode"
     },
     "CLD Barcode": {
