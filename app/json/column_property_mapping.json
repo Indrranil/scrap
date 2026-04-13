@@ -8,11 +8,11 @@
         "property_label": "Back"
     },
     "Material Code-Front": {
-        "property_key": "material_code",
+        "property_key": "front_material_code",
         "property_label": "Front"
     },
     "Material Code-Back": {
-        "property_key": "material_code",
+        "property_key": "back_material_code",
         "property_label": "Back"
     },
     "Primary Carton Material Code": {
