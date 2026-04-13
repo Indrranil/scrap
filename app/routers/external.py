@@ -53,13 +53,13 @@ async def process_payload(pipeline_id: int = Query(...), payload: dict = Body(..
     for key, value in payload.items():
         p = {
             "pipeline_session_output_id": new_pipeline_session_output_id,
-            "name": key,
-            "output_key": key,
-            "output_value": value,
+            "name": str(key),
+            "output_key": str(key),
+            "output_value": str(value),
             "status": "success",
             "verdict": "1",
             "created_at": int(time.time()),
-            "is_usable": value
+            "is_usable": 1
         }
         pipeline_session_output_units.append(PipelineSessionOutputUnit(**p))
     db.add_all(pipeline_session_output_units)
