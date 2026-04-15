@@ -26,6 +26,7 @@ from app.routers.product import router as product_router
 from app.routers.signin import router as signin_router
 from app.routers.users import router as user_router
 from app.routers.external import router as external_router
+from app.routers.controller import router as controller_router
 from app.routers.ws_router import broadcast_controller, output_stream_router
 
 # ... other router imports ...
@@ -60,6 +61,7 @@ app.include_router(user_router)
 app.include_router(pipeline_input_router)
 app.include_router(analytics_router)
 app.include_router(external_router)
+app.include_router(controller_router)
 
 # Create database tables
 Base.metadata.create_all(bind=engine)

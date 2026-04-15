@@ -1,3 +1,4 @@
+import json
 import time
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -28,6 +29,9 @@ def get_shift_start_time():
 
 @router.post("/pipeline-session-output-unit", status_code=201)
 async def process_payload(pipeline_id: int = Query(...), payload: dict = Body(...), db: Session = Depends(get_db)):
+    current_time = datetime.now(tz=tz)
+    with open(f"/app/images/payload_{str(current_time).replace(' ', '_').replace('.', '_')}.json") as f:
+        json.dump(f, payload, indent=3)
     shift_start_time, shift_end_time = get_shift_start_time()
     current_session = db.query(PipelineSession).filter(
         and_(PipelineSession.pipeline_id == pipeline_id, PipelineSession.created_at > shift_start_time.timestamp(),
@@ -51,6 +55,8 @@ async def process_payload(pipeline_id: int = Query(...), payload: dict = Body(..
 
     pipeline_session_output_units = []
     for key, value in payload.items():
+        if isinstance(value, list) or isinstance(value, dict):
+            continue
         p = {
             "pipeline_session_output_id": new_pipeline_session_output_id,
             "name": str(key),
