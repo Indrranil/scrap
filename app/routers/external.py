@@ -30,8 +30,8 @@ def get_shift_start_time():
 @router.post("/pipeline-session-output-unit", status_code=201)
 async def process_payload(pipeline_id: int = Query(...), payload: dict = Body(...), db: Session = Depends(get_db)):
     current_time = datetime.now(tz=tz)
-    with open(f"/app/images/payload_{str(current_time).replace(' ', '_').replace('.', '_')}.json") as f:
-        json.dump(f, payload, indent=3)
+    with open(f"/app/images/payload_{str(current_time.timestamp())}.json", "w") as f:
+        json.dump(payload, f, indent=3)
     shift_start_time, shift_end_time = get_shift_start_time()
     current_session = db.query(PipelineSession).filter(
         and_(PipelineSession.pipeline_id == pipeline_id, PipelineSession.created_at > shift_start_time.timestamp(),

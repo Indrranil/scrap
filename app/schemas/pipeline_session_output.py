@@ -22,3 +22,8 @@ class PipelineSessionOutput(PipelineSessionOutputBase):
 
     class Config:
         from_attributes = True
+
+
+class PipelineSessionOutputUpdate(BaseModel):
+    name: Optional[str] = None
+    ended_at: Optional[int] = None

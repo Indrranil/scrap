@@ -16,7 +16,7 @@ from app.models.pipeline_session_output import (
 from app.models.pipeline_session_output_unit import PipelineSessionOutputUnit
 from app.schemas.pipeline_session_output import (
     PipelineSessionOutput,
-    PipelineSessionOutputCreate,
+    PipelineSessionOutputCreate, PipelineSessionOutputUpdate,
 )
 
 router = APIRouter(
@@ -249,3 +249,21 @@ async def get_pipeline_session_output(
         raise HTTPException(
             status_code=500, detail=f"Error fetching pipeline session output: {str(e)}"
         )
+
+
+@router.patch("/", status_code=status.HTTP_200_OK)
+async def update_pipeline_session_output_unit(
+        output_update: PipelineSessionOutputUpdate,
+        output_id: int = Query(...),
+        db: Session = Depends(get_db),
+        _: bool = Depends(require_roles(["app_admin", "app_user"])),
+):
+    update_data = output_update.model_dump(exclude_unset=True)
+    output = db.query(PipelineSessionOutputModel).filter(PipelineSessionOutputModel.id == output_id)
+    if output.first() is None:
+        raise HTTPException(status_code=404, detail=f"Pipeline session output with ID {output_id} not found")
+    for key, value in update_data.items():
+        setattr(output, key, value)
+
+    db.commit()
+    return

@@ -15,7 +15,7 @@ if getenv("TESTING") == "1":
 else:
     DATABASE_URL = f"mysql+pymysql://{getenv('MYSQL_USER')}:{getenv('MYSQL_PASSWORD')}@{getenv('MYSQL_HOST')}:{getenv('MYSQL_PORT')}/{getenv('MYSQL_DATABASE')}"
 
-engine = create_engine(DATABASE_URL)
+engine = create_engine(DATABASE_URL, pool_size=20, max_overflow=0)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
