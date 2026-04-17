@@ -259,8 +259,8 @@ async def update_pipeline_session_output_unit(
         _: bool = Depends(require_roles(["app_admin", "app_user"])),
 ):
     update_data = output_update.model_dump(exclude_unset=True)
-    output = db.query(PipelineSessionOutputModel).filter(PipelineSessionOutputModel.id == output_id)
-    if output.first() is None:
+    output = db.query(PipelineSessionOutputModel).filter(PipelineSessionOutputModel.id == output_id).first()
+    if output is None:
         raise HTTPException(status_code=404, detail=f"Pipeline session output with ID {output_id} not found")
     for key, value in update_data.items():
         setattr(output, key, value)
