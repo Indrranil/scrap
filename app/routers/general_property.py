@@ -66,6 +66,7 @@ async def get_all_properties(
                 "property_key": prop.property_key,
                 "property_value": prop.property_value,
                 "property_value_type": "string",
+                "tags": prop.tags,
                 "created_at": prop.created_at,
             }
             for prop in properties
