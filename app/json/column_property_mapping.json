@@ -83,6 +83,10 @@
         "property_key": "coding",
         "property_label": "Expiry Date"
     },
+    "Target Weight": {
+        "property_key": "target_weight",
+        "property_label": "Weight"
+    },
     "Target Weight (g)": {
         "property_key": "target_weight",
         "property_label": "Weight"
@@ -98,6 +102,10 @@
     "Product Name": {
         "property_key": "product_name",
         "property_label": "Product Name"
+    },
+    "Barcode": {
+        "property_key": "barcode",
+        "property_label": "Barcode"
     },
     "Variant Barcode": {
         "property_key": "barcode",

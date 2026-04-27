@@ -18,6 +18,8 @@ class ProductUploadCreate(BaseModel):
     factory_code: Optional[str] = Field(None, alias="Factory Code")
     target_weight: Optional[float] = Field(None, alias="Target Weight (g)")
     tare_weight: Optional[float] = Field(None, alias="Tare Weight (g)")
+    pqs_carton: Optional[int] = Field(None, alias="PQS Carton")
+    pqs_tube: Optional[int] = Field(None, alias="PQS Carton")
     front_face: Optional[str] = Field(None, alias="Front Face")
     back_face: Optional[str] = Field(None, alias="Back Face")
     left_face: Optional[str] = Field(None, alias="Left Face")

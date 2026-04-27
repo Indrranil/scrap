@@ -394,6 +394,18 @@
                 "type": "float",
                 "required": false,
                 "property_type": "target_weight"
+            },
+            {
+                "name": "PQS Carton",
+                "type": "int",
+                "required": false,
+                "property_type": "pqs_carton"
+            },
+            {
+                "name": "PQS Tube",
+                "type": "int",
+                "required": false,
+                "property_type": "pqs_tube"
             }
         ]
     },
