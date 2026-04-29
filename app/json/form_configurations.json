@@ -336,28 +336,28 @@
                 "property_type": "carton_coding"
             },
             {
-                "name": "Factory Code",
+                "name": "Carton Price",
                 "type": "text",
                 "required": false,
                 "property_type": "carton_coding"
             },
             {
-                "name": "Price",
+                "name": "Carton Factory Code",
                 "type": "text",
                 "required": false,
                 "property_type": "carton_coding"
             },
             {
-                "name": "USP",
+                "name": "Carton Manufacturing Date",
                 "type": "text",
                 "required": false,
                 "property_type": "carton_coding"
             },
             {
-                "name": "Manufacturing Date",
+                "name": "Tube Price",
                 "type": "text",
                 "required": false,
-                "property_type": "carton_coding"
+                "property_type": "tube_coding"
             },
             {
                 "name": "Tube Factory Code",
