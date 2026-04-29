@@ -170,5 +170,13 @@
     "Carton Material Code": {
         "property_key": "carton_material_code",
         "property_label": "Carton Material Code"
+    },
+    "Batch Code": {
+        "property_key": "coding",
+        "property_label": "Batch Code"
+    },
+    "Tube Batch Code": {
+        "property_key": "tube_coding",
+        "property_label": "Tube Batch Code"
     }
 }

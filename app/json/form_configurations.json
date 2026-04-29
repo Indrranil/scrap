@@ -82,7 +82,7 @@
                 "property_type": "barcode"
             },
             {
-                "name": "Target Weight (g)",
+                "name": "Weight",
                 "type": "float",
                 "required": false,
                 "property_type": "target_weight"
@@ -202,7 +202,7 @@
                 "property_type": "tube_coding"
             },
             {
-                "name": "Target Weight (g)",
+                "name": "Weight",
                 "type": "float",
                 "required": false,
                 "property_type": "target_weight"
@@ -360,19 +360,19 @@
                 "property_type": "carton_coding"
             },
             {
-                "name": "Factory Code Tube",
+                "name": "Tube Factory Code",
                 "type": "text",
                 "required": false,
                 "property_type": "tube_coding"
             },
             {
-                "name": "Manufacturing Date Tube",
+                "name": "Tube Manufacturing Date",
                 "type": "text",
                 "required": false,
                 "property_type": "tube_coding"
             },
             {
-                "name": "Batch Code Tube",
+                "name": "Tube Batch Code",
                 "type": "text",
                 "required": false,
                 "property_type": "tube_coding"
@@ -390,7 +390,7 @@
                 "property_type": "tube_material_code"
             },
             {
-                "name": "Target Weight",
+                "name": "Weight",
                 "type": "float",
                 "required": false,
                 "property_type": "target_weight"
@@ -432,7 +432,7 @@
                 "property_type": "sachet_coding"
             },
             {
-                "name": "Target Weight",
+                "name": "Weight",
                 "type": "float",
                 "required": false,
                 "property_type": "physical_properties"
