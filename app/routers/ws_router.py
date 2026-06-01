@@ -19,15 +19,17 @@ class BroadcastController:
 
     def publish(self, topic: str, data: Any) -> None:
         if not self._pub_lock.get(topic, False):
+            print(f"INFO: Publishing data to topic {topic}")
             self._topics[topic] = data
             self._pub_lock[topic] = True
             loop = asyncio.get_event_loop()
             for callback in self._subscribers[topic]:
                 loop.create_task(callback(data))
+                print(f"INFO: Published data to subscriber {callback}")
             self._pub_lock[topic] = False
 
     def subscribe(
-        self, topic: str, callback: Callable[[Any], Coroutine[Any, Any, None]], keep_alive: bool = False
+        self, topic: str, callback: Callable[[Any], Coroutine[Any, Any, None]], keep_alive: bool = False, send_latest: bool = False
     ) -> bool:
         # Initialize topic if it doesn't exist and keep_alive is enabled
         if topic not in self._topics:
@@ -41,9 +43,11 @@ class BroadcastController:
         self._subscribers[topic].append(callback)
 
         # Send latest data if available (not None)
-        if self._topics[topic] is not None:
-            loop = asyncio.get_event_loop()
-            loop.create_task(callback(self._topics[topic]))
+        if send_latest:
+            if self._topics[topic] is not None:
+                print(f"INFO: Sending latest data to subscriber [{callback}]")
+                loop = asyncio.get_event_loop()
+                loop.create_task(callback(self._topics[topic]))
 
         return True
 

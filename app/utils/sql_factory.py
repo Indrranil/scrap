@@ -71,7 +71,7 @@ class SQLFactory:
         elif q == SQLQuery.CUMULATIVE_VALUE:
             return f"""
             SELECT 
-                SUM(CAST(REPLACE(psou.output_value, '{kwargs.get("suffix")}', '') AS DECIMAL(10,3))) AS cumulative_value
+                SUM(CAST(REGEXP_REPLACE(psou.output_value, '[^0-9.]', '') AS DECIMAL(10,3))) AS cumulative_value
             FROM
                 pipeline_session_output_unit psou
             JOIN
@@ -87,7 +87,7 @@ class SQLFactory:
 
 f"""
 SELECT 
-                SUM(CAST(REPLACE(psou.output_value, 'kg', '') AS DECIMAL(10,3))) AS cumulative_value
+                CAST(REGEXP_REPLACE(psou.output_value, '[^0-9.]', '') AS DECIMAL(10,3)) AS cumulative_value
             FROM
                 pipeline_session_output_unit psou
             JOIN
@@ -95,5 +95,5 @@ SELECT
             JOIN
                 pipeline_session ps ON ps.id = pso.pipeline_session_id AND ps.pipeline_id = 4
             WHERE
-                psou.created_at >= 0 AND psou.created_at <= 1773054714 AND psou.output_key = 'weight';
+                psou.created_at >= 1777628671 AND psou.created_at <= 1780307074 AND psou.output_key = 'weight';
 """

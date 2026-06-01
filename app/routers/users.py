@@ -6,6 +6,7 @@ import pandas as pd
 from dotenv import load_dotenv
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from keycloak import KeycloakAdmin  # type: ignore
+from starlette import status
 
 from app.auth.auth import require_roles
 from app.schemas.user import (
@@ -31,62 +32,66 @@ keycloak_admin = KeycloakAdmin(
 )
 
 
+@router.get("/roles/all", status_code=status.HTTP_200_OK)
+async def get_all_roles(_: bool = Depends(require_roles(["app_admin", "app_user"]))):
+    roles = keycloak_admin.get_realm_roles()
+    filtered = [role for role in roles if "custom" in role["description"]]
+    return filtered
+
+
 @router.post("/")
 async def create_user(user_data: UserCreate):
-    try:
-        # Create user without roles first
-        existing_users = keycloak_admin.get_users({"username": user_data.username})
-        if existing_users:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Username '{user_data.username}' already exists",
-            )
+    # Create user without roles first
+    existing_users = keycloak_admin.get_users({"username": user_data.username})
+    if existing_users:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Username '{user_data.username}' already exists",
+        )
 
-        # Check if email already exists
-        existing_email_users = keycloak_admin.get_users({"email": user_data.email})
-        if existing_email_users:
-            raise HTTPException(
-                status_code=409, detail=f"Email '{user_data.email}' already exists"
-            )
-        user = {
-            "username": user_data.username,
-            "email": user_data.email,
-            "enabled": True,
-            "firstName": user_data.firstName,
-            "lastName": user_data.lastName,
-            "credentials": [
-                {"type": "password", "value": user_data.password, "temporary": False}
-            ],
-        }
+    # Check if email already exists
+    existing_email_users = keycloak_admin.get_users({"email": user_data.email})
+    if existing_email_users:
+        raise HTTPException(
+            status_code=409, detail=f"Email '{user_data.email}' already exists"
+        )
+    user = {
+        "username": user_data.username,
+        "email": user_data.email,
+        "enabled": True,
+        "firstName": user_data.firstName,
+        "lastName": user_data.lastName,
+        "credentials": [
+            {"type": "password", "value": user_data.password, "temporary": False}
+        ],
+    }
 
-        # Create user
-        user_id = keycloak_admin.create_user(user)
+    # Create user
+    user_id = keycloak_admin.create_user(user)
 
-        # Add roles if specified
-        if user_data.roles and len(user_data.roles) > 0:
-            try:
-                # Get available roles
-                available_roles = keycloak_admin.get_realm_roles()
-                role_dict = {role["name"]: role for role in available_roles}
+    # Add roles if specified
+    if user_data.roles and len(user_data.roles) > 0:
+        try:
+            # Get available roles
+            available_roles = keycloak_admin.get_realm_roles()
+            role_dict = {role["name"]: role for role in available_roles}
 
-                # Filter and assign existing roles
-                roles_to_assign = []
-                for role_name in user_data.roles:
-                    if role_name in role_dict:
-                        roles_to_assign.append(role_dict[role_name])
+            # Filter and assign existing roles
+            roles_to_assign = []
+            for role_name in user_data.roles:
+                if role_name in role_dict:
+                    roles_to_assign.append(role_dict[role_name])
 
-                if roles_to_assign:
-                    keycloak_admin.assign_realm_roles(
-                        user_id=user_id, roles=roles_to_assign
-                    )
+            if roles_to_assign:
+                keycloak_admin.assign_realm_roles(
+                    user_id=user_id, roles=roles_to_assign
+                )
 
-            except Exception as role_error:
-                print(f"Error assigning roles: {str(role_error)}")
-                # Continue even if role assignment fails
+        except Exception as role_error:
+            print(f"Error assigning roles: {str(role_error)}")
+            # Continue even if role assignment fails
 
-        return {"message": "User created successfully", "user_id": user_id}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+    return {"message": "User created successfully", "user_id": user_id}
 
 
 @router.post("/bulk")
