@@ -178,5 +178,13 @@
     "Tube Batch Code": {
         "property_key": "tube_coding",
         "property_label": "Tube Batch Code"
+    },
+    "Coding Format":{
+        "property_key": "coding_format",
+        "property_label": "Coding Format"
+    },
+    "Product Label":{
+        "property_key": "label",
+        "property_label": "Product Label"
     }
 }
