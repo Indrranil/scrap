@@ -16,16 +16,15 @@ def list_employees(
     db: Session = Depends(get_db),
     _: bool = Depends(require_roles(["shopfloor", "scrapeyard"])),
 ):
-    """List active employee profiles for the logged-in plant."""
+    """List active employee profiles for the logged-in plant or scrapeyard."""
     user = get_current_user(request)
-    plant_id = user.get("plant_id")
-    employees = (
-        db.query(EmployeeProfile)
-        .filter(
-            EmployeeProfile.plant_id == plant_id,
-            EmployeeProfile.is_active.is_(True),
-        )
-        .all()
-    )
+    query = db.query(EmployeeProfile).filter(EmployeeProfile.is_active.is_(True))
+
+    if user.get("role") == "shopfloor":
+        query = query.filter(EmployeeProfile.plant_id == user.get("plant_id"))
+    elif user.get("role") == "scrapeyard":
+        query = query.filter(EmployeeProfile.scrapeyard_id == user.get("scrapeyard_id"))
+
+    employees = query.all()
     items = [EmployeeSummary(id=e.id, name=e.name) for e in employees]
     return EmployeeListResponse(total=len(items), items=items)

@@ -3,6 +3,7 @@ from app.models.employee_profile import EmployeeProfile
 from app.models.plant import Plant
 from app.models.rejection_detail import RejectionDetail
 from app.models.scrap_sale import ScrapSale
+from app.models.scrapeyard import Scrapeyard
 from app.models.transfer import Transfer
 from app.models.transfer_event import TransferEvent
 
@@ -12,6 +13,7 @@ __all__ = [
     "Plant",
     "RejectionDetail",
     "ScrapSale",
+    "Scrapeyard",
     "Transfer",
     "TransferEvent",
 ]

@@ -3,19 +3,15 @@ from decimal import Decimal
 from typing import List, Optional
 
 from fastapi import HTTPException
-from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import validate_employee
-from app.models.employee_profile import EmployeeProfile
+from app.auth.dependencies import validate_plant_employee, validate_scrapeyard_employee
 from app.models.enums import (
     ActorRole,
-    AppRole,
     RejectionReasonType,
     TransferEventType,
     TransferStatus,
 )
-from app.models.plant import Plant
 from app.models.rejection_detail import RejectionDetail
 from app.models.transfer import Transfer
 from app.models.transfer_event import TransferEvent
@@ -25,21 +21,46 @@ from app.schemas.transfer import (
     QRScanResponse,
     RejectRequest,
     RejectionDetailResponse,
+    ResolvedPlantInfo,
     TransferEventResponse,
     TransferListItem,
     TransferResponse,
 )
+from app.services.plant_resolver import resolve_plant_by_qr_location
 from app.services.qr_parser import parse_qr_payload
+from app.services.scrapeyard import scrapeyard_service
 
 
 class TransferService:
-    def scan_qr(self, db: Session, qr_raw: str) -> QRScanResponse:
+    def scan_qr(
+        self,
+        db: Session,
+        qr_raw: str,
+        logged_in_plant_id: Optional[int] = None,
+    ) -> QRScanResponse:
         payload = parse_qr_payload(qr_raw)
         existing = (
             db.query(Transfer).filter(Transfer.qr_number == payload.qr_number).first()
         )
+
+        resolved_plant = None
+        plant_match = None
+        if payload.location is not None:
+            plant = resolve_plant_by_qr_location(db, payload.location)
+            resolved_plant = ResolvedPlantInfo(
+                id=plant.id,
+                code=plant.code,
+                name=plant.name,
+                login_id=plant.login_id,
+                qr_location=plant.qr_location,
+            )
+            if logged_in_plant_id is not None:
+                plant_match = plant.id == logged_in_plant_id
+
         return QRScanResponse(
             payload=payload,
+            resolved_plant=resolved_plant,
+            plant_match=plant_match,
             existing_transfer_id=existing.id if existing else None,
             existing_status=existing.status if existing else None,
         )
@@ -83,7 +104,6 @@ class TransferService:
                     employee_name=e.employee_name,
                     quantity=e.quantity,
                     comment=e.comment,
-                    photo_path=e.photo_path,
                     created_at=e.created_at,
                 )
                 for e in events
@@ -103,8 +123,8 @@ class TransferService:
         self,
         db: Session,
         *,
-        plant_id: Optional[int] = None,
-        role: Optional[str] = None,
+        shopfloor_plant_id: Optional[int] = None,
+        scrapeyard_id: Optional[int] = None,
         item_code: Optional[str] = None,
         material_name: Optional[str] = None,
         status: Optional[TransferStatus] = None,
@@ -116,10 +136,10 @@ class TransferService:
     ) -> tuple[int, List[TransferListItem]]:
         query = db.query(Transfer)
 
-        if plant_id and role == AppRole.SHOPFLOOR.value:
-            query = query.filter(Transfer.shopfloor_plant_id == plant_id)
-        elif plant_id and role == AppRole.SCRAPEYARD.value:
-            query = query.filter(Transfer.scrapeyard_plant_id == plant_id)
+        if shopfloor_plant_id:
+            query = query.filter(Transfer.shopfloor_plant_id == shopfloor_plant_id)
+        if scrapeyard_id:
+            query = query.filter(Transfer.scrapeyard_id == scrapeyard_id)
 
         if item_code:
             query = query.filter(Transfer.item_code.ilike(f"%{item_code}%"))
@@ -158,29 +178,29 @@ class TransferService:
         ]
         return total, items
 
-    def _resolve_scrapeyard_plant(
-        self, db: Session, shopfloor_plant: Plant
-    ) -> Optional[int]:
-        if shopfloor_plant.linked_scrapeyard_plant_id:
-            return shopfloor_plant.linked_scrapeyard_plant_id
-        sy_plant = (
-            db.query(Plant)
-            .filter(
-                Plant.app_role == AppRole.SCRAPEYARD,
-                Plant.is_active.is_(True),
-            )
-            .first()
-        )
-        return sy_plant.id if sy_plant else None
-
     def dispatch(
         self,
         db: Session,
-        plant_id: int,
+        logged_in_plant_id: int,
         data: DispatchRequest,
     ) -> TransferResponse:
-        employee = validate_employee(db, plant_id, data.employee_id)
+        employee = validate_plant_employee(db, logged_in_plant_id, data.employee_id)
         payload = parse_qr_payload(data.qr_raw)
+
+        if payload.location is None:
+            raise HTTPException(
+                status_code=422, detail="QR payload must include LOCATION"
+            )
+
+        qr_plant = resolve_plant_by_qr_location(db, payload.location)
+        if qr_plant.id != logged_in_plant_id:
+            raise HTTPException(
+                status_code=403,
+                detail=(
+                    f"QR belongs to {qr_plant.name} ({qr_plant.login_id}); "
+                    f"you are logged in as a different plant"
+                ),
+            )
 
         existing = (
             db.query(Transfer).filter(Transfer.qr_number == payload.qr_number).first()
@@ -191,12 +211,8 @@ class TransferService:
                 detail=f"QR already used with status {existing.status.value}",
             )
 
-        shopfloor_plant = db.query(Plant).filter(Plant.id == plant_id).first()
-        if not shopfloor_plant:
-            raise HTTPException(status_code=404, detail="Plant not found")
-
+        scrapeyard = scrapeyard_service.get_active(db)
         now = int(time.time())
-        scrapeyard_id = self._resolve_scrapeyard_plant(db, shopfloor_plant)
 
         if existing:
             transfer = existing
@@ -204,13 +220,14 @@ class TransferService:
             transfer.status = TransferStatus.DISPATCHED
             transfer.dispatched_by = employee.id
             transfer.dispatched_at = now
-            transfer.scrapeyard_plant_id = scrapeyard_id
+            transfer.scrapeyard_id = scrapeyard.id
+            transfer.shopfloor_plant_id = qr_plant.id
         else:
             transfer = Transfer(
                 qr_raw=data.qr_raw,
                 qr_number=payload.qr_number,
-                shopfloor_plant_id=plant_id,
-                scrapeyard_plant_id=scrapeyard_id,
+                shopfloor_plant_id=qr_plant.id,
+                scrapeyard_id=scrapeyard.id,
                 item_code=payload.item_code,
                 item_name=payload.item_name,
                 description=payload.description,
@@ -236,7 +253,6 @@ class TransferService:
                 employee_profile_id=employee.id,
                 employee_name=employee.name,
                 quantity=transfer.quantity_sent,
-                photo_path=data.photo_path,
                 created_at=now,
             )
         )
@@ -247,10 +263,12 @@ class TransferService:
     def accept(
         self,
         db: Session,
-        plant_id: int,
+        scrapeyard_id: int,
         data: AcceptRequest,
     ) -> TransferResponse:
-        employee = validate_employee(db, plant_id, data.employee_id)
+        employee = validate_scrapeyard_employee(
+            db, scrapeyard_id, data.employee_id
+        )
         transfer = db.query(Transfer).filter(Transfer.id == data.transfer_id).first()
         if not transfer:
             raise HTTPException(status_code=404, detail="Transfer not found")
@@ -259,8 +277,8 @@ class TransferService:
                 status_code=400,
                 detail=f"Cannot accept transfer in status {transfer.status.value}",
             )
-        if transfer.scrapeyard_plant_id and transfer.scrapeyard_plant_id != plant_id:
-            raise HTTPException(status_code=403, detail="Transfer not for this plant")
+        if transfer.scrapeyard_id and transfer.scrapeyard_id != scrapeyard_id:
+            raise HTTPException(status_code=403, detail="Transfer not for this scrapeyard")
 
         now = int(time.time())
         transfer.status = TransferStatus.ACCEPTED
@@ -268,8 +286,8 @@ class TransferService:
         transfer.gr_number = data.gr_number
         transfer.processed_by = employee.id
         transfer.processed_at = now
-        if not transfer.scrapeyard_plant_id:
-            transfer.scrapeyard_plant_id = plant_id
+        if not transfer.scrapeyard_id:
+            transfer.scrapeyard_id = scrapeyard_id
 
         db.add(
             TransferEvent(
@@ -279,7 +297,6 @@ class TransferService:
                 employee_profile_id=employee.id,
                 employee_name=employee.name,
                 quantity=transfer.quantity_received,
-                photo_path=data.photo_path,
                 created_at=now,
             )
         )
@@ -290,10 +307,12 @@ class TransferService:
     def reject(
         self,
         db: Session,
-        plant_id: int,
+        scrapeyard_id: int,
         data: RejectRequest,
     ) -> TransferResponse:
-        employee = validate_employee(db, plant_id, data.employee_id)
+        employee = validate_scrapeyard_employee(
+            db, scrapeyard_id, data.employee_id
+        )
         transfer = db.query(Transfer).filter(Transfer.id == data.transfer_id).first()
         if not transfer:
             raise HTTPException(status_code=404, detail="Transfer not found")
@@ -334,8 +353,8 @@ class TransferService:
         transfer.quantity_received = qty_received
         transfer.processed_by = employee.id
         transfer.processed_at = now
-        if not transfer.scrapeyard_plant_id:
-            transfer.scrapeyard_plant_id = plant_id
+        if not transfer.scrapeyard_id:
+            transfer.scrapeyard_id = scrapeyard_id
 
         db.add(
             RejectionDetail(
@@ -355,7 +374,6 @@ class TransferService:
                 employee_name=employee.name,
                 quantity=qty_received,
                 comment=comment,
-                photo_path=data.photo_path,
                 created_at=now,
             )
         )
@@ -370,7 +388,7 @@ class TransferService:
         transfer_id: int,
         employee_id: int,
     ) -> TransferResponse:
-        employee = validate_employee(db, plant_id, employee_id)
+        employee = validate_plant_employee(db, plant_id, employee_id)
         transfer = db.query(Transfer).filter(Transfer.id == transfer_id).first()
         if not transfer:
             raise HTTPException(status_code=404, detail="Transfer not found")

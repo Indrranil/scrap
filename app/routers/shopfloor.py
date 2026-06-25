@@ -18,7 +18,7 @@ def dispatch_material(
     _: bool = Depends(require_roles(["shopfloor"])),
     db: Session = Depends(get_db),
 ):
-    """Confirm dispatch after QR scan."""
+    """Confirm dispatch after QR scan. Logged-in plant must match QR location."""
     user = get_current_user(request)
     return transfer_service.dispatch(db, user["plant_id"], body)
 
@@ -37,8 +37,7 @@ def list_rejected(
     user = get_current_user(request)
     total, items = transfer_service.list_transfers(
         db,
-        plant_id=user["plant_id"],
-        role="shopfloor",
+        shopfloor_plant_id=user["plant_id"],
         item_code=item_code,
         material_name=material_name,
         rejected_only=True,

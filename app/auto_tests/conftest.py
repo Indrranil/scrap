@@ -33,6 +33,14 @@ def setup_database():
     Base.metadata.drop_all(bind=engine)
 
 
+@pytest.fixture(autouse=True)
+def clean_db(db_session):
+    for table in reversed(Base.metadata.sorted_tables):
+        db_session.execute(table.delete())
+    db_session.commit()
+    yield
+
+
 @pytest.fixture
 def db_session():
     session = TestingSessionLocal()
@@ -61,7 +69,17 @@ DATE: 23-06-2026
 TIME: 09:22:02
 CODE: 1313
 DESCRIPTION: CORRUGATED BOX SCRAP
-LOCATION: 2
+LOCATION: 3
 NET WT.: 7.350 Kg
 TARE WT.: 0.000 Kg
 GROSS WT.: 7.350 Kg"""
+
+SAMPLE_QR_UTE = """HIDUSTAN UNILEVER LIMITED
+DATE: 23-06-2026
+TIME: 09:22:02
+CODE: 9999
+DESCRIPTION: PAPER WASTE
+LOCATION: 2
+NET WT.: 5.000 Kg
+TARE WT.: 0.000 Kg
+GROSS WT.: 5.000 Kg"""

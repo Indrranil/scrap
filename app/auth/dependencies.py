@@ -26,13 +26,7 @@ def get_current_user(request: Request) -> dict:
     return user
 
 
-def get_employee_id(
-    x_employee_id: Optional[int] = Header(None, alias="X-Employee-Id"),
-) -> Optional[int]:
-    return x_employee_id
-
-
-def validate_employee(
+def validate_plant_employee(
     db: Session,
     plant_id: int,
     employee_id: int,
@@ -51,15 +45,22 @@ def validate_employee(
     return employee
 
 
-def require_employee(
-    request: Request,
-    db: Session = Depends(get_db),
-    x_employee_id: Optional[int] = Header(None, alias="X-Employee-Id"),
+def validate_scrapeyard_employee(
+    db: Session,
+    scrapeyard_id: int,
+    employee_id: int,
 ) -> EmployeeProfile:
-    if x_employee_id is None:
-        raise HTTPException(status_code=400, detail="X-Employee-Id header is required")
-    user = get_current_user(request)
-    plant_id = user.get("plant_id")
-    if plant_id is None:
-        raise HTTPException(status_code=400, detail="Plant context required")
-    return validate_employee(db, plant_id, x_employee_id)
+    employee = (
+        db.query(EmployeeProfile)
+        .filter(
+            EmployeeProfile.id == employee_id,
+            EmployeeProfile.scrapeyard_id == scrapeyard_id,
+            EmployeeProfile.is_active.is_(True),
+        )
+        .first()
+    )
+    if not employee:
+        raise HTTPException(
+            status_code=400, detail="Invalid employee for this scrapeyard"
+        )
+    return employee

@@ -2,7 +2,6 @@ from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
-from app.models.enums import AppRole
 from app.schemas.auth import EmployeeSummary
 
 
@@ -11,9 +10,8 @@ class PlantCreate(BaseModel):
     name: str
     login_id: str
     password: str
-    app_role: AppRole
+    qr_location: int
     address: Optional[str] = None
-    linked_scrapeyard_plant_id: Optional[int] = None
     employee_names: List[str] = Field(default_factory=list)
 
 
@@ -22,9 +20,8 @@ class PlantUpdate(BaseModel):
     name: Optional[str] = None
     login_id: Optional[str] = None
     password: Optional[str] = None
-    app_role: Optional[AppRole] = None
+    qr_location: Optional[int] = None
     address: Optional[str] = None
-    linked_scrapeyard_plant_id: Optional[int] = None
     employee_names: Optional[List[str]] = None
 
 
@@ -33,9 +30,8 @@ class PlantResponse(BaseModel):
     code: Optional[str] = None
     name: str
     login_id: str
-    app_role: AppRole
+    qr_location: int
     address: Optional[str] = None
-    linked_scrapeyard_plant_id: Optional[int] = None
     is_active: bool
     employees: List[EmployeeSummary] = []
 

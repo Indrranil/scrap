@@ -31,11 +31,14 @@ def _parse_date(date_str: Optional[str]) -> Optional[int]:
 @router.post("/scan", response_model=QRScanResponse)
 def scan_qr(
     body: QRScanRequest,
+    request: Request,
     _: bool = Depends(require_roles(["shopfloor", "scrapeyard"])),
     db: Session = Depends(get_db),
 ):
     """Parse QR payload and return material preview."""
-    return transfer_service.scan_qr(db, body.qr_raw)
+    user = get_current_user(request)
+    plant_id = user.get("plant_id") if user.get("role") == "shopfloor" else None
+    return transfer_service.scan_qr(db, body.qr_raw, logged_in_plant_id=plant_id)
 
 
 @router.get("/history", response_model=TransferListResponse)
@@ -55,17 +58,29 @@ def transfer_history(
     """List transfers with filters."""
     user = get_current_user(request)
     role = user.get("role")
-    effective_plant = plant_id or user.get("plant_id")
+
+    shopfloor_plant_id = None
+    scrapeyard_id = None
+    if role == "shopfloor":
+        shopfloor_plant_id = user.get("plant_id")
+    elif role == "scrapeyard":
+        scrapeyard_id = user.get("scrapeyard_id")
+    elif role == "admin" and plant_id:
+        shopfloor_plant_id = plant_id
+
+    date_to_ts = _parse_date(date_to)
+    if date_to_ts:
+        date_to_ts += 86399
 
     total, items = transfer_service.list_transfers(
         db,
-        plant_id=effective_plant if role != "admin" or plant_id else plant_id,
-        role=role if role != "admin" else None,
+        shopfloor_plant_id=shopfloor_plant_id,
+        scrapeyard_id=scrapeyard_id,
         item_code=item_code,
         material_name=material_name,
         status=status,
         date_from=_parse_date(date_from),
-        date_to=_parse_date(date_to) + 86399 if date_to else None,
+        date_to=date_to_ts,
         skip=(page - 1) * page_size,
         limit=page_size,
     )

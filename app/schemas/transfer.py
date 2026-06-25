@@ -1,8 +1,7 @@
-from datetime import date
 from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.models.enums import RejectionReasonType, TransferEventType, TransferStatus
 
@@ -22,12 +21,22 @@ class QRPayload(BaseModel):
     time_str: Optional[str] = None
 
 
+class ResolvedPlantInfo(BaseModel):
+    id: int
+    code: Optional[str] = None
+    name: str
+    login_id: str
+    qr_location: int
+
+
 class QRScanRequest(BaseModel):
     qr_raw: str
 
 
 class QRScanResponse(BaseModel):
     payload: QRPayload
+    resolved_plant: Optional[ResolvedPlantInfo] = None
+    plant_match: Optional[bool] = None
     existing_transfer_id: Optional[int] = None
     existing_status: Optional[TransferStatus] = None
 
@@ -36,14 +45,12 @@ class DispatchRequest(BaseModel):
     qr_raw: str
     gp_number: str
     employee_id: int
-    photo_path: Optional[str] = None
 
 
 class AcceptRequest(BaseModel):
     transfer_id: int
     gr_number: str
     employee_id: int
-    photo_path: Optional[str] = None
 
 
 class RejectRequest(BaseModel):
@@ -53,7 +60,6 @@ class RejectRequest(BaseModel):
     qty_received: Optional[Decimal] = None
     material_received_name: Optional[str] = None
     comment: Optional[str] = None
-    photo_path: Optional[str] = None
 
 
 class TransferEventResponse(BaseModel):
@@ -63,7 +69,6 @@ class TransferEventResponse(BaseModel):
     employee_name: str
     quantity: Optional[Decimal] = None
     comment: Optional[str] = None
-    photo_path: Optional[str] = None
     created_at: int
 
     class Config:

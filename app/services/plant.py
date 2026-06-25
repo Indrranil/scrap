@@ -26,9 +26,8 @@ class PlantService:
             code=plant.code,
             name=plant.name,
             login_id=plant.login_id,
-            app_role=plant.app_role,
+            qr_location=plant.qr_location,
             address=plant.address,
-            linked_scrapeyard_plant_id=plant.linked_scrapeyard_plant_id,
             is_active=plant.is_active,
             employees=[EmployeeSummary(id=e.id, name=e.name) for e in employees],
         )
@@ -58,33 +57,24 @@ class PlantService:
         return self._to_response(db, plant)
 
     def create_plant(self, db: Session, data: PlantCreate) -> PlantResponse:
-        existing = db.query(Plant).filter(Plant.login_id == data.login_id).first()
-        if existing:
+        if db.query(Plant).filter(Plant.login_id == data.login_id).first():
             raise HTTPException(status_code=409, detail="Login ID already exists")
+        if db.query(Plant).filter(Plant.qr_location == data.qr_location).first():
+            raise HTTPException(status_code=409, detail="QR location already in use")
 
         plant = Plant(
             code=data.code,
             name=data.name,
             login_id=data.login_id,
             password_hash=hash_password(data.password),
-            app_role=data.app_role,
+            qr_location=data.qr_location,
             address=data.address,
-            linked_scrapeyard_plant_id=data.linked_scrapeyard_plant_id,
             is_active=True,
             created_at=int(time.time()),
         )
         db.add(plant)
         db.flush()
-
-        for name in data.employee_names:
-            db.add(
-                EmployeeProfile(
-                    plant_id=plant.id,
-                    name=name,
-                    is_active=True,
-                    created_at=int(time.time()),
-                )
-            )
+        self._sync_employees(db, plant.id, data.employee_names)
         db.commit()
         db.refresh(plant)
         return self._to_response(db, plant)
@@ -101,14 +91,22 @@ class PlantService:
             raise HTTPException(status_code=404, detail="Plant not found")
 
         if data.login_id and data.login_id != plant.login_id:
-            conflict = (
+            if (
                 db.query(Plant)
                 .filter(Plant.login_id == data.login_id, Plant.id != plant_id)
                 .first()
-            )
-            if conflict:
+            ):
                 raise HTTPException(status_code=409, detail="Login ID already exists")
             plant.login_id = data.login_id
+
+        if data.qr_location is not None and data.qr_location != plant.qr_location:
+            if (
+                db.query(Plant)
+                .filter(Plant.qr_location == data.qr_location, Plant.id != plant_id)
+                .first()
+            ):
+                raise HTTPException(status_code=409, detail="QR location already in use")
+            plant.qr_location = data.qr_location
 
         if data.code is not None:
             plant.code = data.code
@@ -116,26 +114,11 @@ class PlantService:
             plant.name = data.name
         if data.password:
             plant.password_hash = hash_password(data.password)
-        if data.app_role is not None:
-            plant.app_role = data.app_role
         if data.address is not None:
             plant.address = data.address
-        if data.linked_scrapeyard_plant_id is not None:
-            plant.linked_scrapeyard_plant_id = data.linked_scrapeyard_plant_id
 
         if data.employee_names is not None:
-            db.query(EmployeeProfile).filter(
-                EmployeeProfile.plant_id == plant.id
-            ).update({"is_active": False})
-            for name in data.employee_names:
-                db.add(
-                    EmployeeProfile(
-                        plant_id=plant.id,
-                        name=name,
-                        is_active=True,
-                        created_at=int(time.time()),
-                    )
-                )
+            self._sync_employees(db, plant.id, data.employee_names)
 
         db.commit()
         db.refresh(plant)
@@ -170,7 +153,6 @@ class PlantService:
             )
             .all()
         )
-
         new_login = f"{source.login_id}-copy-{int(time.time())}"
         return self.create_plant(
             db,
@@ -179,12 +161,27 @@ class PlantService:
                 name=f"{source.name} (Copy)",
                 login_id=new_login,
                 password="ChangeMe123!",
-                app_role=source.app_role,
+                qr_location=source.qr_location + 1000,
                 address=source.address,
-                linked_scrapeyard_plant_id=source.linked_scrapeyard_plant_id,
                 employee_names=[e.name for e in employees],
             ),
         )
+
+    def _sync_employees(
+        self, db: Session, plant_id: int, names: List[str]
+    ) -> None:
+        db.query(EmployeeProfile).filter(
+            EmployeeProfile.plant_id == plant_id
+        ).update({"is_active": False})
+        for name in names:
+            db.add(
+                EmployeeProfile(
+                    plant_id=plant_id,
+                    name=name,
+                    is_active=True,
+                    created_at=int(time.time()),
+                )
+            )
 
 
 plant_service = PlantService()

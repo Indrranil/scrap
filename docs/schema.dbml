@@ -1,0 +1,102 @@
+// DigiScrapyard schema — import at https://dbdiagram.io
+
+Table plant {
+  id int [pk, increment]
+  code varchar(50)
+  name varchar(255) [not null]
+  login_id varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  qr_location int [not null, unique, note: 'Maps to QR LOCATION field: UTE=2, UDE=3, U535=4']
+  address varchar(500)
+  is_active boolean [not null]
+  created_at bigint [not null]
+}
+
+Table scrapeyard {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  login_id varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  is_active boolean [not null]
+  created_at bigint [not null]
+  note: 'Single shared scrapeyard for all shopfloor plants'
+}
+
+Table admin_user {
+  id int [pk, increment]
+  username varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  name varchar(255) [not null]
+  is_active boolean [not null]
+  created_at bigint [not null]
+}
+
+Table employee_profile {
+  id int [pk, increment]
+  plant_id int [ref: > plant.id]
+  scrapeyard_id int [ref: > scrapeyard.id]
+  name varchar(255) [not null]
+  is_active boolean [not null]
+  created_at bigint [not null]
+  note: 'Exactly one of plant_id or scrapeyard_id should be set'
+}
+
+Table transfer {
+  id int [pk, increment]
+  qr_raw varchar(2000) [not null]
+  qr_number varchar(255) [not null, unique]
+  shopfloor_plant_id int [not null, ref: > plant.id]
+  scrapeyard_id int [ref: > scrapeyard.id]
+  item_code varchar(100) [not null]
+  item_name varchar(500) [not null]
+  description varchar(500)
+  uom varchar(10) [not null]
+  quantity_sent decimal(12,3) [not null]
+  quantity_received decimal(12,3)
+  gp_number varchar(100)
+  gr_number varchar(100)
+  location int [note: 'QR LOCATION value at dispatch time']
+  net_weight decimal(12,3)
+  tare_weight decimal(12,3)
+  gross_weight decimal(12,3)
+  status varchar(20) [not null, note: 'pending|dispatched|accepted|rejected|acknowledged|sold']
+  dispatched_by int [ref: > employee_profile.id]
+  dispatched_at bigint
+  processed_by int [ref: > employee_profile.id]
+  processed_at bigint
+  acknowledged_by int [ref: > employee_profile.id]
+  acknowledged_at bigint
+}
+
+Table transfer_event {
+  id int [pk, increment]
+  transfer_id int [not null, ref: > transfer.id]
+  event_type varchar(20) [not null]
+  actor_role varchar(20) [not null]
+  employee_profile_id int [ref: > employee_profile.id]
+  employee_name varchar(255) [not null]
+  quantity decimal(12,3)
+  comment text
+  photo_path varchar(500) [note: 'Deferred in v1 API']
+  created_at bigint [not null]
+}
+
+Table rejection_detail {
+  id int [pk, increment]
+  transfer_id int [not null, unique, ref: > transfer.id]
+  reason_type varchar(30) [not null, note: 'quantity_mismatch|wrong_material|others']
+  qty_received decimal(12,3)
+  material_received_name varchar(500)
+  comment text
+}
+
+Table scrap_sale {
+  id int [pk, increment]
+  transfer_id int [not null, ref: > transfer.id]
+  plant_id int [not null, ref: > plant.id]
+  quantity_kg decimal(12,3)
+  quantity_ea decimal(12,3)
+  amount_inr decimal(14,2) [not null]
+  sold_at bigint [not null]
+  notes text
+}

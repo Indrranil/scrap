@@ -24,16 +24,28 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("login_id", sa.String(length=255), nullable=False),
         sa.Column("password_hash", sa.String(length=255), nullable=False),
-        sa.Column("app_role", sa.String(length=20), nullable=False),
+        sa.Column("qr_location", sa.Integer(), nullable=False),
         sa.Column("address", sa.String(length=500), nullable=True),
-        sa.Column("linked_scrapeyard_plant_id", sa.Integer(), nullable=True),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("created_at", sa.BigInteger(), nullable=False),
-        sa.ForeignKeyConstraint(["linked_scrapeyard_plant_id"], ["plant.id"]),
+        sa.PrimaryKeyConstraint("id"),
+        sa.UniqueConstraint("login_id"),
+        sa.UniqueConstraint("qr_location"),
+    )
+    op.create_index("ix_plant_login_id", "plant", ["login_id"])
+
+    op.create_table(
+        "scrapeyard",
+        sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
+        sa.Column("name", sa.String(length=255), nullable=False),
+        sa.Column("login_id", sa.String(length=255), nullable=False),
+        sa.Column("password_hash", sa.String(length=255), nullable=False),
+        sa.Column("is_active", sa.Boolean(), nullable=False),
+        sa.Column("created_at", sa.BigInteger(), nullable=False),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("login_id"),
     )
-    op.create_index("ix_plant_login_id", "plant", ["login_id"])
+    op.create_index("ix_scrapeyard_login_id", "scrapeyard", ["login_id"])
 
     op.create_table(
         "admin_user",
@@ -51,14 +63,19 @@ def upgrade() -> None:
     op.create_table(
         "employee_profile",
         sa.Column("id", sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column("plant_id", sa.Integer(), nullable=False),
+        sa.Column("plant_id", sa.Integer(), nullable=True),
+        sa.Column("scrapeyard_id", sa.Integer(), nullable=True),
         sa.Column("name", sa.String(length=255), nullable=False),
         sa.Column("is_active", sa.Boolean(), nullable=False),
         sa.Column("created_at", sa.BigInteger(), nullable=False),
         sa.ForeignKeyConstraint(["plant_id"], ["plant.id"]),
+        sa.ForeignKeyConstraint(["scrapeyard_id"], ["scrapeyard.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
     op.create_index("ix_employee_profile_plant_id", "employee_profile", ["plant_id"])
+    op.create_index(
+        "ix_employee_profile_scrapeyard_id", "employee_profile", ["scrapeyard_id"]
+    )
 
     op.create_table(
         "transfer",
@@ -66,7 +83,7 @@ def upgrade() -> None:
         sa.Column("qr_raw", sa.String(length=2000), nullable=False),
         sa.Column("qr_number", sa.String(length=255), nullable=False),
         sa.Column("shopfloor_plant_id", sa.Integer(), nullable=False),
-        sa.Column("scrapeyard_plant_id", sa.Integer(), nullable=True),
+        sa.Column("scrapeyard_id", sa.Integer(), nullable=True),
         sa.Column("item_code", sa.String(length=100), nullable=False),
         sa.Column("item_name", sa.String(length=500), nullable=False),
         sa.Column("description", sa.String(length=500), nullable=True),
@@ -89,7 +106,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["acknowledged_by"], ["employee_profile.id"]),
         sa.ForeignKeyConstraint(["dispatched_by"], ["employee_profile.id"]),
         sa.ForeignKeyConstraint(["processed_by"], ["employee_profile.id"]),
-        sa.ForeignKeyConstraint(["scrapeyard_plant_id"], ["plant.id"]),
+        sa.ForeignKeyConstraint(["scrapeyard_id"], ["scrapeyard.id"]),
         sa.ForeignKeyConstraint(["shopfloor_plant_id"], ["plant.id"]),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("qr_number"),
@@ -97,6 +114,7 @@ def upgrade() -> None:
     op.create_index("ix_transfer_qr_number", "transfer", ["qr_number"])
     op.create_index("ix_transfer_status", "transfer", ["status"])
     op.create_index("ix_transfer_shopfloor_plant_id", "transfer", ["shopfloor_plant_id"])
+    op.create_index("ix_transfer_scrapeyard_id", "transfer", ["scrapeyard_id"])
     op.create_index("ix_transfer_item_code", "transfer", ["item_code"])
     op.create_index("ix_transfer_item_name", "transfer", ["item_name"])
 
@@ -157,4 +175,5 @@ def downgrade() -> None:
     op.drop_table("transfer")
     op.drop_table("employee_profile")
     op.drop_table("admin_user")
+    op.drop_table("scrapeyard")
     op.drop_table("plant")

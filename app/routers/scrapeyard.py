@@ -17,7 +17,7 @@ def accept_material(
     db: Session = Depends(get_db),
 ):
     """Accept a dispatched transfer."""
-    return transfer_service.accept(db, user["plant_id"], body)
+    return transfer_service.accept(db, user["scrapeyard_id"], body)
 
 
 @router.post("/reject", response_model=TransferResponse)
@@ -28,4 +28,4 @@ def reject_material(
     db: Session = Depends(get_db),
 ):
     """Reject a dispatched transfer with reason."""
-    return transfer_service.reject(db, user["plant_id"], body)
+    return transfer_service.reject(db, user["scrapeyard_id"], body)

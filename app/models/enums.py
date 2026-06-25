@@ -1,11 +1,6 @@
 import enum
 
 
-class AppRole(str, enum.Enum):
-    SHOPFLOOR = "shopfloor"
-    SCRAPEYARD = "scrapeyard"
-
-
 class TransferStatus(str, enum.Enum):
     PENDING = "pending"
     DISPATCHED = "dispatched"

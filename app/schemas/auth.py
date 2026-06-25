@@ -1,15 +1,11 @@
-from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel, Field
-
-from app.models.enums import AppRole, RejectionReasonType, TransferStatus
+from pydantic import BaseModel
 
 
 class LoginRequest(BaseModel):
     login_id: str
     password: str
-    app_role: Optional[AppRole] = None
 
 
 class EmployeeSummary(BaseModel):
@@ -26,5 +22,7 @@ class LoginResponse(BaseModel):
     role: str
     plant_id: Optional[int] = None
     plant_name: Optional[str] = None
+    scrapeyard_id: Optional[int] = None
+    scrapeyard_name: Optional[str] = None
     admin_name: Optional[str] = None
     employees: List[EmployeeSummary] = []

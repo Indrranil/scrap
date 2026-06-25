@@ -28,6 +28,7 @@ def create_access_token(
     subject: str,
     role: str,
     plant_id: Optional[int] = None,
+    scrapeyard_id: Optional[int] = None,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
     expire = datetime.now(timezone.utc) + (
@@ -40,6 +41,8 @@ def create_access_token(
     }
     if plant_id is not None:
         payload["plant_id"] = plant_id
+    if scrapeyard_id is not None:
+        payload["scrapeyard_id"] = scrapeyard_id
     return jwt.encode(payload, _get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 

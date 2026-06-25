@@ -11,7 +11,7 @@ class Transfer(Base):
     qr_raw = Column(String(2000), nullable=False)
     qr_number = Column(String(255), unique=True, nullable=False, index=True)
     shopfloor_plant_id = Column(Integer, ForeignKey("plant.id"), nullable=False, index=True)
-    scrapeyard_plant_id = Column(Integer, ForeignKey("plant.id"), nullable=True, index=True)
+    scrapeyard_id = Column(Integer, ForeignKey("scrapeyard.id"), nullable=True, index=True)
     item_code = Column(String(100), nullable=False, index=True)
     item_name = Column(String(500), nullable=False, index=True)
     description = Column(String(500), nullable=True)
