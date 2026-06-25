@@ -102,11 +102,8 @@ jobs:
         export MYSQL_HOST=localhost
         export MYSQL_PORT=3306
         export MYSQL_DATABASE=test
-        export KEYCLOAK_URL=http://dummy
-        export KEYCLOAK_CLIENT_ID=dummy
-        export KEYCLOAK_CLIENT_SECRET=dummy
-        export KEYCLOAK_REALM=dummy
-        echo "📋 Running all refactored tests using run_tests.py..."
+        export JWT_SECRET=test-ci-secret
+        echo "📋 Running DigiScrapyard test suite..."
         python run_tests.py --verbose
         if [ $? -eq 0 ]; then
           echo "✅ All refactored tests passed successfully!"

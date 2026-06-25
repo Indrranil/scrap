@@ -114,18 +114,7 @@ def main():
         test_commands.append((f"{pytest_cmd} -m integration app/auto_tests/", "Integration Tests"))
         
     else:  # args.type == "all"
-        # Run all refactored tests
-        test_commands.extend([
-            (f"{pytest_cmd} app/auto_tests/test_services.py", "Service Layer Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_application.py", "Application Router Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_device.py", "Device Router Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_users.py", "Users Router Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_signin.py", "Signin Router Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_general_property.py", "General Property Router Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_pipeline.py", "Pipeline Router Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_pipeline_input.py", "Pipeline Input Router Tests"),
-            (f"{pytest_cmd} app/auto_tests/test_router_pipeline_session.py", "Pipeline Session Router Tests")
-        ])
+        test_commands.append((f"{pytest_cmd} app/auto_tests/", "DigiScrapyard Test Suite"))
     
     # Run the tests
     all_passed = True

@@ -1,0 +1,35 @@
+# .cursorignore
+
+# --- Python & Environment Caches ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+.venv/
+venv/
+env/
+
+# --- Database Dumps & Heavy SQL Raw Data ---
+build_infra/app_db_backup.sql
+build_infra/init.sql
+sql/
+
+# --- Security, Certificates & Credentials ---
+keycloak/certs/
+*.p12
+*.pem
+*.key
+.env
+env-example.sh
+
+# --- Static Images & Logs ---
+app/images/
+*.log
+
+# --- Test Artifacts & UI Mockups ---
+# Only ignore if you don't want Cursor referencing the local test UI mockup
+app/tests/ui/

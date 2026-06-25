@@ -1,6 +1,6 @@
 services:
   api:
-    container_name: api
+    container_name: digiscrapyard-api
     build:
       context: ..
       dockerfile: build_infra/Dockerfile.api
@@ -8,27 +8,28 @@ services:
     volumes:
       - ../app/images:/app/images
     environment:
-      - API_PORT=${API_PORT}
+      - API_PORT=${API_PORT:-8000}
       - MYSQL_HOST=mysql
       - MYSQL_USER=${MYSQL_USER}
       - MYSQL_PASSWORD=${MYSQL_PASSWORD}
       - MYSQL_DATABASE=${MYSQL_DATABASE}
-      - MYSQL_PORT=${MYSQL_PORT}
+      - MYSQL_PORT=${MYSQL_PORT:-3306}
+      - JWT_SECRET=${JWT_SECRET}
+      - JWT_EXPIRE_HOURS=${JWT_EXPIRE_HOURS:-24}
     ports:
       - ${API_PORT:-8000}:${API_PORT:-8000}
     networks:
-      - polarisai-services-nw
+      - digiscrapyard-nw
     depends_on:
       mysql:
         condition: service_healthy
-      keycloak:
-        condition: service_started
     healthcheck:
-      test: [ 'CMD', 'curl', '--silent', '--fail', '-X', 'GET', 'http://localhost:${API_PORT}/' ]
+      test: ['CMD', 'curl', '--silent', '--fail', '-X', 'GET', 'http://localhost:${API_PORT:-8000}/']
       start_period: 10s
       interval: 10s
       timeout: 5s
       retries: 2
+
   mysql:
     build: .
     environment:
@@ -42,54 +43,17 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     networks:
-      - polarisai-services-nw
+      - digiscrapyard-nw
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  keycloak:
-    image: quay.io/keycloak/keycloak:latest
-    environment:
-      KC_DB: "mysql"
-      KC_DB_URL: "jdbc:mysql://mysql:3306/keycloak_db"
-      KC_DB_USERNAME: ${KC_DB_USERNAME}
-      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
-      KEYCLOAK_ADMIN: admin
-      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-      KC_HOSTNAME_STRICT: "false"
-      KC_HOSTNAME_STRICT_HTTPS: "true"
-      KEYCLOAK_SCRIPT_UPLOAD: "true"
-      KC_HTTPS_KEY_STORE_PASSWORD: ${KC_HTTPS_KEY_STORE_PASSWORD}
-      KC_HTTPS_KEY_STORE_FILE: opt/keycloak/conf/keystore.p12
-    restart: always
-    volumes:
-      - keycloak_data:/opt/keycloak/data
-      - ../keycloak/import:/opt/keycloak/data/import
-      - ${KEYCLOAK_SSL_CERT}:/opt/keycloak/conf/keystore.p12
-    ports:
-      - "${KEYCLOAK_HTTP_PORT}:${KEYCLOAK_HTTP_PORT}"
-      - "${KEYCLOAK_HTTPS_PORT}:${KEYCLOAK_HTTPS_PORT}"
-    networks:
-      - polarisai-services-nw
-    depends_on:
-      mysql:
-        condition: service_healthy
-    command: 
-      - start-dev
-      - --import-realm
-      - --verbose
 volumes:
   mysql_data:
-    name: polarisai_mysql_data
-    external: true
-  keycloak_data:
-    name: polarisai_keycloak_data
-    external: true
-      
+    name: digiscrapyard_mysql_data
 
 networks:
-  polarisai-services-nw:
-    name: polarisai-services-nw
-    external: true
+  digiscrapyard-nw:
+    name: digiscrapyard-nw

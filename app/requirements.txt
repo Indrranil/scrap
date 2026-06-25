@@ -1,21 +1,11 @@
-# python 3.10
-fastapi==0.105.0
+fastapi>=0.105.0
 uvicorn
-wsproto
 sqlalchemy
 pymysql
-python-keycloak 
-fastapi-keycloak 
-python-jose[cryptography]
-passlib 
-bcrypt
-pyjwt
-pytest 
-pytest-asyncio 
-pytest-cov
-pytest-mock
-httpx
 python-dotenv
-pandas
 python-multipart
 pydantic[email]
+python-jose[cryptography]
+bcrypt
+alembic
+qrcode[pil]

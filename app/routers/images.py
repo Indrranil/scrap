@@ -6,8 +6,8 @@ from fastapi.responses import FileResponse
 
 router = APIRouter(prefix="/v1/images", tags=["images"])
 
-# Base directory for images - Docker bind mount to ./app/images
-IMAGES_BASE_DIR = Path("/app/images")
+# Base directory for images - works locally and in Docker
+IMAGES_BASE_DIR = Path(__file__).resolve().parent.parent / "images"
 
 # Valid image file extensions
 VALID_IMAGE_EXTENSIONS = {'.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.tiff', '.ico', '.mp4', '.avi', '.json'}
