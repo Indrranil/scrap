@@ -1,6 +1,6 @@
 # DigiScrapyard API — Frontend Integration Guide
 
-Base URL: `http://<host>:<port>` (default `http://localhost:8000`)
+Base URL: `http://<host>:<port>` (default `http://localhost:8006`)
 
 Interactive docs: `/docs` (Swagger) · `/redoc`
 
