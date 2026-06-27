@@ -172,6 +172,8 @@ def _parse_vendor_blocks(path: str) -> List[Tuple[str, List[Tuple[str, str, str,
     current_items: List[Tuple[str, str, str, Decimal]] = []
 
     for row in ws.iter_rows(values_only=True):
+        if len(row) < 2:
+            continue
         label = row[1]
         if label and row[0] is None and label not in ("Annexure", "Effective Rate", "Item Code"):
             if current_vendor and current_items:
@@ -191,8 +193,8 @@ def _parse_vendor_blocks(path: str) -> List[Tuple[str, List[Tuple[str, str, str,
             continue
 
         code = str(int(raw_code)) if isinstance(raw_code, (int, float)) else str(raw_code)
-        uom = str(row[2]).strip().upper() if row[2] else ""
-        rate = Decimal(str(row[3])) if row[3] is not None else Decimal("0")
+        uom = str(row[2]).strip().upper() if len(row) > 2 and row[2] else ""
+        rate = Decimal(str(row[3])) if len(row) > 3 and row[3] is not None else Decimal("0")
         current_items.append((code, name, uom, rate))
 
     if current_vendor and current_items:
