@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal
 
 import pytest
 
@@ -10,6 +11,7 @@ from app.constants.items import (
 from scripts.import_client_data import (
     _load_plu_rows,
     _load_rates_pdf,
+    _parse_rate,
     _resolve_item_code,
 )
 
@@ -39,6 +41,15 @@ def test_p_item_has_no_item_code_but_shred_output():
     assert item_code is None
     assert shred_out_code == "1000091259"
     assert shred_out_name == "CARTONS -JT"
+
+
+def test_parse_rate_handles_invalid_values():
+    assert _parse_rate(5.3) == Decimal("5.3")
+    assert _parse_rate("13.5") == Decimal("13.5")
+    assert _parse_rate("-") is None
+    assert _parse_rate("") is None
+    assert _parse_rate("N/A") is None
+    assert _parse_rate("not-a-number") is None
 
 
 def test_shared_item_code_allowed_across_plus():

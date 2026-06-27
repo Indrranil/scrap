@@ -13,7 +13,7 @@ import argparse
 import os
 import sys
 import time
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import Dict, List, Optional, Tuple
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,6 +46,20 @@ except ImportError as exc:
 
 def _normalize_name(name: str) -> str:
     return " ".join(name.upper().split())
+
+
+def _parse_rate(value) -> Optional[Decimal]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    text = str(value).strip().replace(",", "")
+    if not text or text in ("-", "N/A", "NA", "—"):
+        return None
+    try:
+        return Decimal(text)
+    except InvalidOperation:
+        return None
 
 
 def _load_plu_rows(path: str) -> List[Tuple[str, str, str]]:
@@ -193,7 +207,9 @@ def _parse_vendor_blocks(path: str) -> List[Tuple[str, List[Tuple[str, str, str,
 
         code = str(int(raw_code)) if isinstance(raw_code, (int, float)) else str(raw_code)
         uom = str(row[2]).strip().upper() if len(row) > 2 and row[2] else ""
-        rate = Decimal(str(row[3])) if len(row) > 3 and row[3] is not None else Decimal("0")
+        rate = _parse_rate(row[3]) if len(row) > 3 else None
+        if rate is None:
+            continue
         current_items.append((code, name, uom, rate))
 
     if current_vendor and current_items:
