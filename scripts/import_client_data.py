@@ -138,7 +138,7 @@ def import_items(db: Session, item_code_path: str, client_data_path: str) -> Non
 def _parse_vendor_blocks(path: str) -> List[Tuple[str, List[Tuple[Optional[str], str, str, Decimal]]]]:
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb["Rates 2026"]
-    vendors: List[Tuple[str, List[Tuple[Optional[str], str, str, Decimal]]]]] = []
+    vendors: List[Tuple[str, List[Tuple[Optional[str], str, str, Decimal]]]] = []
     current_vendor: Optional[str] = None
     current_items: List[Tuple[Optional[str], str, str, Decimal]] = []
 
