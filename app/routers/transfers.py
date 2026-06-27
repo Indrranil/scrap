@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user, require_roles
 from app.database.connection import get_db
-from app.models.enums import TransferStatus
+from app.models.enums import MaterialState, TransferStatus
 from app.schemas.transfer import (
     QRScanRequest,
     QRScanResponse,
@@ -49,6 +49,7 @@ def transfer_history(
     date_from: Optional[str] = Query(None, description="YYYY-MM-DD"),
     date_to: Optional[str] = Query(None, description="YYYY-MM-DD"),
     status: Optional[TransferStatus] = None,
+    material_state: Optional[MaterialState] = None,
     plant_id: Optional[int] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
@@ -79,6 +80,7 @@ def transfer_history(
         item_code=item_code,
         material_name=material_name,
         status=status,
+        material_state=material_state,
         date_from=_parse_date(date_from),
         date_to=date_to_ts,
         skip=(page - 1) * page_size,

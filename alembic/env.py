@@ -9,11 +9,15 @@ from app.database.connection import Base
 from app.models import (  # noqa: F401
     AdminUser,
     EmployeeProfile,
+    ItemMaster,
     Plant,
     RejectionDetail,
     ScrapSale,
+    Scrapeyard,
     Transfer,
     TransferEvent,
+    Vendor,
+    VendorItem,
 )
 
 load_dotenv()

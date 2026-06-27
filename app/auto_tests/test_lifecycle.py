@@ -6,6 +6,7 @@ from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
 
 from app.auto_tests.conftest import SAMPLE_QR, SAMPLE_QR_UTE
+from app.auto_tests.item_fixtures import seed_ea_item, seed_test_item
 
 
 def _create_scrapeyard(db):
@@ -57,6 +58,7 @@ def _create_plant(db, code, login_id, qr_location):
 
 
 def test_full_lifecycle_dispatch_accept(client, db_session):
+    seed_test_item(db_session)
     sy, sy_emp = _create_scrapeyard(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
 
@@ -69,13 +71,14 @@ def test_full_lifecycle_dispatch_accept(client, db_session):
         headers={"Authorization": f"Bearer {ude_token}"},
         json={
             "qr_raw": SAMPLE_QR,
-            "gp_number": "125",
             "employee_id": ude_emp.id,
         },
     )
     assert dispatch.status_code == 200
     transfer_id = dispatch.json()["id"]
     assert dispatch.json()["status"] == "dispatched"
+    assert dispatch.json()["item_code"] == "1000090313"
+    assert dispatch.json()["plu_code"] == "1313"
 
     sy_token = client.post(
         "/v1/auth/login", json={"login_id": "SCRAP", "password": "1234"}
@@ -86,7 +89,6 @@ def test_full_lifecycle_dispatch_accept(client, db_session):
         headers={"Authorization": f"Bearer {sy_token}"},
         json={
             "transfer_id": transfer_id,
-            "gr_number": "123",
             "employee_id": sy_emp.id,
         },
     )
@@ -95,6 +97,12 @@ def test_full_lifecycle_dispatch_accept(client, db_session):
 
 
 def test_dispatch_plant_mismatch_returns_403(client, db_session):
+    seed_test_item(
+        db_session,
+        plu_code="9999",
+        item_code="1000090086",
+        name="PAPER WASTE",
+    )
     _create_scrapeyard(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
     _create_plant(db_session, "UTE", "UTE", 2)
@@ -108,7 +116,6 @@ def test_dispatch_plant_mismatch_returns_403(client, db_session):
         headers={"Authorization": f"Bearer {ude_token}"},
         json={
             "qr_raw": SAMPLE_QR_UTE,
-            "gp_number": "126",
             "employee_id": ude_emp.id,
         },
     )
@@ -116,6 +123,12 @@ def test_dispatch_plant_mismatch_returns_403(client, db_session):
 
 
 def test_reject_and_acknowledge(client, db_session):
+    seed_test_item(
+        db_session,
+        plu_code="9999",
+        item_code="1000090086",
+        name="PAPER WASTE",
+    )
     sy, sy_emp = _create_scrapeyard(db_session)
     ute, ute_emp = _create_plant(db_session, "UTE", "UTE", 2)
 
@@ -128,7 +141,6 @@ def test_reject_and_acknowledge(client, db_session):
         headers={"Authorization": f"Bearer {ute_token}"},
         json={
             "qr_raw": SAMPLE_QR_UTE,
-            "gp_number": "126",
             "employee_id": ute_emp.id,
         },
     )
@@ -164,6 +176,7 @@ def test_reject_and_acknowledge(client, db_session):
 
 
 def test_scan_returns_plant_match(client, db_session):
+    seed_test_item(db_session)
     _create_plant(db_session, "UDE", "UDE", 3)
 
     ude_token = client.post(
@@ -179,6 +192,109 @@ def test_scan_returns_plant_match(client, db_session):
     body = scan.json()
     assert body["resolved_plant"]["login_id"] == "UDE"
     assert body["plant_match"] is True
+    assert body["payload"]["item_name"] == "CORRUGATED BOX SCRAP"
+    assert body["payload"]["item_code_8"] == "1000090313"
+
+
+def test_manual_ea_dispatch(client, db_session):
+    ea_item = seed_ea_item(db_session)
+    _create_scrapeyard(db_session)
+    ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+
+    ude_token = client.post(
+        "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
+    ).json()["access_token"]
+
+    items = client.get(
+        "/v1/shopfloor/items",
+        headers={"Authorization": f"Bearer {ude_token}"},
+    )
+    assert items.status_code == 200
+    assert any(i["id"] == ea_item.id for i in items.json()["items"])
+
+    dispatch = client.post(
+        "/v1/shopfloor/dispatch/manual",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={
+            "item_master_id": ea_item.id,
+            "quantity": "10",
+            "material_state": "not_shredded",
+            "employee_id": ude_emp.id,
+        },
+    )
+    assert dispatch.status_code == 200
+    body = dispatch.json()
+    assert body["dispatch_method"] == "manual"
+    assert body["uom"] == "EA"
+    assert body["quantity_sent"] == "10.000"
+
+
+def test_ea_qr_dispatch_rejected(client, db_session):
+    ea_item = seed_ea_item(db_session)
+    _create_scrapeyard(db_session)
+    ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+
+    ea_qr = """HIDUSTAN UNILEVER LIMITED
+DATE: 23-06-2026
+TIME: 09:22:02
+CODE: 1021
+LOCATION: 3"""
+
+    ude_token = client.post(
+        "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
+    ).json()["access_token"]
+
+    dispatch = client.post(
+        "/v1/shopfloor/dispatch",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={"qr_raw": ea_qr, "employee_id": ude_emp.id},
+    )
+    assert dispatch.status_code == 422
+    assert "manual dispatch" in dispatch.json()["detail"].lower()
+
+
+def test_shreddable_item_requires_material_state(client, db_session):
+    seed_test_item(
+        db_session,
+        plu_code="P106",
+        item_code="1000090406",
+        name="Bottles & Caps",
+        is_shreddable=True,
+    )
+    _create_scrapeyard(db_session)
+    ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+
+    shreddable_qr = """HIDUSTAN UNILEVER LIMITED
+DATE: 23-06-2026
+TIME: 09:22:02
+CODE: P106
+LOCATION: 3
+NET WT.: 5.000 Kg
+GROSS WT.: 5.000 Kg"""
+
+    ude_token = client.post(
+        "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
+    ).json()["access_token"]
+
+    missing_state = client.post(
+        "/v1/shopfloor/dispatch",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={"qr_raw": shreddable_qr, "employee_id": ude_emp.id},
+    )
+    assert missing_state.status_code == 422
+
+    dispatch = client.post(
+        "/v1/shopfloor/dispatch",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={
+            "qr_raw": shreddable_qr,
+            "employee_id": ude_emp.id,
+            "material_state": "shredded",
+        },
+    )
+    assert dispatch.status_code == 200
+    assert dispatch.json()["material_state"] == "shredded"
+    assert dispatch.json()["is_shreddable"] is True
 
 
 def test_admin_plant_crud(client, db_session):

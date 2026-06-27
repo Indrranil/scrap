@@ -44,10 +44,16 @@ GROSS WT.: 7.350 Kg
 
 | Field | Required for | Notes |
 |-------|--------------|-------|
-| `CODE` | Scan | Item code |
-| `DESCRIPTION` | Scan | Item / material name |
-| `LOCATION` | Dispatch | Maps to shopfloor plant |
+| `CODE` | Scan + dispatch | 4-digit PLU code — looked up in `item_master` for name and 8-digit code |
+| `DESCRIPTION` | — | Optional; item name comes from DB lookup |
+| `LOCATION` | QR dispatch | Maps to shopfloor plant |
 | Weight lines | Scan | `GROSS WT.` or `NET WT.` used for quantity (KG) |
+
+**Dispatch rules by UOM:**
+- **KG items** → QR dispatch only (`POST /v1/shopfloor/dispatch`)
+- **EA items** → manual dispatch only (`POST /v1/shopfloor/dispatch/manual`)
+
+**Shreddable items:** 8 KG PLU codes (`1499`, `P159`, `P106`, `PB06`, `PC06`, `P100`, `P177`, `P153`) require `material_state` (`shredded` or `not_shredded`) on QR dispatch. All other items default to `not_shredded`.
 
 ---
 
@@ -241,8 +247,11 @@ sequenceDiagram
   "payload": {
     "qr_number": "8e6174a45b3bf73b",
     "item_code": "1313",
+    "plu_code": "1313",
+    "item_code_8": "1000090313",
     "item_name": "CORRUGATED BOX SCRAP",
-    "description": "CORRUGATED BOX SCRAP",
+    "is_shreddable": false,
+    "requires_material_state": false,
     "location": 3,
     "net_weight": "7.350",
     "tare_weight": "0.000",
@@ -267,21 +276,38 @@ sequenceDiagram
 
 - **`plant_match`:** `true` / `false` for **shopfloor** only (logged-in plant vs QR location).
 - **Scrapeyard:** `plant_match` is `null`; use `existing_transfer_id` when a transfer already exists.
+- Returns **422** if PLU code is unknown or item UOM is `EA` (use manual dispatch).
 
-### 2. Dispatch (Shopfloor)
+### 2. Dispatch — QR (Shopfloor, KG items)
 
 `POST /v1/shopfloor/dispatch`
 ```json
 {
   "qr_raw": "<same scanned string>",
-  "gp_number": "GP-125",
-  "employee_id": 1
+  "employee_id": 1,
+  "material_state": "not_shredded"
 }
 ```
 
-Returns **403** if QR location plant does not match logged-in plant.
+`material_state` is **required** when the item is shreddable; omit or pass `not_shredded` for other KG items.
+
+Returns **403** if QR location plant does not match logged-in plant. Returns **422** for EA items.
 
 **Response:** full `TransferResponse` (see below) with `status: "dispatched"`.
+
+### 2b. Dispatch — Manual (Shopfloor, EA items)
+
+`GET /v1/shopfloor/items` — list active EA items for dropdowns.
+
+`POST /v1/shopfloor/dispatch/manual`
+```json
+{
+  "item_master_id": 12,
+  "quantity": "10",
+  "material_state": "not_shredded",
+  "employee_id": 1
+}
+```
 
 ### 3. Accept (Scrapeyard)
 
@@ -289,7 +315,6 @@ Returns **403** if QR location plant does not match logged-in plant.
 ```json
 {
   "transfer_id": 1,
-  "gr_number": "GR-123",
   "employee_id": 13
 }
 ```
@@ -354,14 +379,16 @@ No request body. Returns **400** if transfer is not in `rejected` status.
 {
   "id": 1,
   "qr_number": "8e6174a45b3bf73b",
-  "item_code": "1313",
+  "plu_code": "1313",
+  "item_code": "1000090313",
   "item_name": "CORRUGATED BOX SCRAP",
   "description": "CORRUGATED BOX SCRAP",
   "uom": "KG",
   "quantity_sent": "7.350",
   "quantity_received": "7.350",
-  "gp_number": "GP-125",
-  "gr_number": "GR-123",
+  "dispatch_method": "qr",
+  "material_state": "not_shredded",
+  "is_shreddable": false,
   "location": 3,
   "net_weight": "7.350",
   "tare_weight": "0.000",
@@ -402,11 +429,15 @@ When rejected, `rejection` contains `reason_type`, `qty_received`, `material_rec
 {
   "id": 1,
   "qr_number": "8e6174a45b3bf73b",
-  "item_code": "1313",
+  "plu_code": "1313",
+  "item_code": "1000090313",
   "item_name": "CORRUGATED BOX SCRAP",
   "uom": "KG",
   "quantity_sent": "7.350",
   "quantity_received": "7.350",
+  "dispatch_method": "qr",
+  "material_state": "not_shredded",
+  "is_shreddable": false,
   "status": "accepted",
   "dispatched_at": 1782396208,
   "processed_at": 1782396216
@@ -419,7 +450,7 @@ When rejected, `rejection` contains `reason_type`, `qty_received`, `material_rec
 
 `GET /v1/transfers/history`
 
-Query params: `page`, `page_size` (max 200), `status`, `date_from`, `date_to` (YYYY-MM-DD), `item_code`, `material_name`, `plant_id` (admin only).
+Query params: `page`, `page_size` (max 200), `status`, `material_state` (`shredded` | `not_shredded`), `date_from`, `date_to` (YYYY-MM-DD), `item_code`, `material_name`, `plant_id` (admin only).
 
 **Role-scoped behavior:**
 
@@ -437,6 +468,38 @@ GET /v1/transfers/history?page=1&page_size=50&status=accepted&date_from=2026-01-
 `GET /v1/shopfloor/rejected` — rejected transfers for logged-in plant awaiting acknowledgement (supports `page`, `page_size`, `item_code`, `material_name`).
 
 `GET /v1/transfers/{id}` — full detail with timeline.
+
+---
+
+## Admin — Item Master
+
+`GET /v1/items` — list/search (`search`, `uom`, `is_shreddable`, `page`, `page_size`)
+
+`POST /v1/items` — create item
+```json
+{
+  "plu_code": "1313",
+  "item_code": "1000090313",
+  "name": "CORRUGATED BOX SCRAP",
+  "uom": "KG",
+  "is_shreddable": false
+}
+```
+
+`GET /v1/items/{id}` · `PATCH /v1/items/{id}` · `DELETE /v1/items/{id}` (soft delete)
+
+Seed client data: `python scripts/import_client_data.py --item-code <path> --client-data <path>`
+
+---
+
+## Admin — Vendors
+
+`GET /v1/vendors` · `POST /v1/vendors` · `GET/PATCH/DELETE /v1/vendors/{id}`
+
+Vendor item assignments:
+- `GET /v1/vendors/{id}/items`
+- `POST /v1/vendors/{id}/items` — `{ "item_id": 1, "rate_inr": "7.00" }`
+- `PATCH /v1/vendors/{id}/items/{vendor_item_id}` · `DELETE /v1/vendors/{id}/items/{vendor_item_id}`
 
 ---
 

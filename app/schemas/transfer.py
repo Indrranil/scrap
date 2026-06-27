@@ -1,15 +1,21 @@
 from decimal import Decimal
 from typing import List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
-from app.models.enums import RejectionReasonType, TransferEventType, TransferStatus
+from app.models.enums import (
+    DispatchMethod,
+    MaterialState,
+    RejectionReasonType,
+    TransferEventType,
+    TransferStatus,
+)
 
 
 class QRPayload(BaseModel):
     qr_number: str
     item_code: str
-    item_name: str
+    item_name: Optional[str] = None
     description: Optional[str] = None
     location: Optional[int] = None
     net_weight: Optional[Decimal] = None
@@ -19,6 +25,10 @@ class QRPayload(BaseModel):
     quantity: Decimal
     date_str: Optional[str] = None
     time_str: Optional[str] = None
+    plu_code: Optional[str] = None
+    item_code_8: Optional[str] = None
+    is_shreddable: bool = False
+    requires_material_state: bool = False
 
 
 class ResolvedPlantInfo(BaseModel):
@@ -43,13 +53,19 @@ class QRScanResponse(BaseModel):
 
 class DispatchRequest(BaseModel):
     qr_raw: str
-    gp_number: str
+    employee_id: int
+    material_state: Optional[MaterialState] = None
+
+
+class ManualDispatchRequest(BaseModel):
+    item_master_id: int
+    quantity: Decimal = Field(..., gt=0)
+    material_state: MaterialState
     employee_id: int
 
 
 class AcceptRequest(BaseModel):
     transfer_id: int
-    gr_number: str
     employee_id: int
 
 
@@ -88,18 +104,20 @@ class RejectionDetailResponse(BaseModel):
 class TransferResponse(BaseModel):
     id: int
     qr_number: str
+    plu_code: Optional[str] = None
     item_code: str
     item_name: str
     description: Optional[str] = None
     uom: str
     quantity_sent: Decimal
     quantity_received: Optional[Decimal] = None
-    gp_number: Optional[str] = None
-    gr_number: Optional[str] = None
     location: Optional[int] = None
     net_weight: Optional[Decimal] = None
     tare_weight: Optional[Decimal] = None
     gross_weight: Optional[Decimal] = None
+    dispatch_method: DispatchMethod
+    material_state: MaterialState
+    is_shreddable: bool = False
     status: TransferStatus
     dispatched_at: Optional[int] = None
     processed_at: Optional[int] = None
@@ -114,11 +132,15 @@ class TransferResponse(BaseModel):
 class TransferListItem(BaseModel):
     id: int
     qr_number: str
+    plu_code: Optional[str] = None
     item_code: str
     item_name: str
     uom: str
     quantity_sent: Decimal
     quantity_received: Optional[Decimal] = None
+    dispatch_method: DispatchMethod
+    material_state: MaterialState
+    is_shreddable: bool = False
     status: TransferStatus
     dispatched_at: Optional[int] = None
     processed_at: Optional[int] = None

@@ -27,3 +27,13 @@ class ActorRole(str, enum.Enum):
     SHOPFLOOR = "shopfloor"
     SCRAPEYARD = "scrapeyard"
     ADMIN = "admin"
+
+
+class DispatchMethod(str, enum.Enum):
+    QR = "qr"
+    MANUAL = "manual"
+
+
+class MaterialState(str, enum.Enum):
+    SHREDDED = "shredded"
+    NOT_SHREDDED = "not_shredded"

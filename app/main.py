@@ -7,6 +7,7 @@ from app.auth.auth import AuthMiddleware
 from app.routers.auth import router as auth_router
 from app.routers.employees import router as employees_router
 from app.routers.images import router as images_router
+from app.routers.items import router as items_router
 from app.routers.plants import router as plants_router
 from app.routers.reporting import router as reporting_router
 from app.routers.sales import router as sales_router
@@ -14,6 +15,7 @@ from app.routers.scrapeyard_admin import router as scrapeyard_admin_router
 from app.routers.scrapeyard import router as scrapeyard_router
 from app.routers.shopfloor import router as shopfloor_router
 from app.routers.transfers import router as transfers_router
+from app.routers.vendors import router as vendors_router
 
 app = FastAPI(
     title="DigiScrapyard API",
@@ -38,6 +40,8 @@ app.include_router(shopfloor_router)
 app.include_router(scrapeyard_router)
 app.include_router(scrapeyard_admin_router)
 app.include_router(plants_router)
+app.include_router(items_router)
+app.include_router(vendors_router)
 app.include_router(reporting_router)
 app.include_router(sales_router)
 app.include_router(images_router)

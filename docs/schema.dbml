@@ -41,24 +41,53 @@ Table employee_profile {
   note: 'Exactly one of plant_id or scrapeyard_id should be set'
 }
 
+Table item_master {
+  id int [pk, increment]
+  plu_code varchar(20) [not null, unique, note: '4-digit / alphanumeric code from QR']
+  item_code varchar(20) [unique, note: '8-digit SAP code']
+  name varchar(500) [not null]
+  uom varchar(10) [not null]
+  is_shreddable boolean [not null, default: false]
+  is_active boolean [not null]
+  created_at bigint [not null]
+  updated_at bigint [not null]
+}
+
+Table vendor {
+  id int [pk, increment]
+  name varchar(255) [not null, unique]
+  is_active boolean [not null]
+  created_at bigint [not null]
+}
+
+Table vendor_item {
+  id int [pk, increment]
+  vendor_id int [not null, ref: > vendor.id]
+  item_id int [not null, ref: > item_master.id]
+  rate_inr decimal(12,2) [not null]
+  note: 'UNIQUE(vendor_id, item_id)'
+}
+
 Table transfer {
   id int [pk, increment]
-  qr_raw varchar(2000) [not null]
+  qr_raw varchar(2000)
   qr_number varchar(255) [not null, unique]
   shopfloor_plant_id int [not null, ref: > plant.id]
   scrapeyard_id int [ref: > scrapeyard.id]
-  item_code varchar(100) [not null]
+  item_master_id int [ref: > item_master.id]
+  plu_code varchar(20) [note: '4-digit PLU at dispatch']
+  item_code varchar(100) [not null, note: '8-digit canonical code']
   item_name varchar(500) [not null]
   description varchar(500)
   uom varchar(10) [not null]
   quantity_sent decimal(12,3) [not null]
   quantity_received decimal(12,3)
-  gp_number varchar(100)
-  gr_number varchar(100)
   location int [note: 'QR LOCATION value at dispatch time']
   net_weight decimal(12,3)
   tare_weight decimal(12,3)
   gross_weight decimal(12,3)
+  dispatch_method varchar(10) [not null, note: 'qr|manual']
+  material_state varchar(20) [not null, note: 'shredded|not_shredded']
   status varchar(20) [not null, note: 'pending|dispatched|accepted|rejected|acknowledged|sold']
   dispatched_by int [ref: > employee_profile.id]
   dispatched_at bigint

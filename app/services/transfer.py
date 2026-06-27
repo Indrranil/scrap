@@ -1,3 +1,4 @@
+import hashlib
 import time
 from decimal import Decimal
 from typing import List, Optional
@@ -8,16 +9,20 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import validate_plant_employee, validate_scrapeyard_employee
 from app.models.enums import (
     ActorRole,
+    DispatchMethod,
+    MaterialState,
     RejectionReasonType,
     TransferEventType,
     TransferStatus,
 )
+from app.models.item_master import ItemMaster
 from app.models.rejection_detail import RejectionDetail
 from app.models.transfer import Transfer
 from app.models.transfer_event import TransferEvent
 from app.schemas.transfer import (
     AcceptRequest,
     DispatchRequest,
+    ManualDispatchRequest,
     QRScanResponse,
     RejectRequest,
     RejectionDetailResponse,
@@ -26,12 +31,62 @@ from app.schemas.transfer import (
     TransferListItem,
     TransferResponse,
 )
+from app.services.item_master import item_master_service
 from app.services.plant_resolver import resolve_plant_by_qr_location
 from app.services.qr_parser import parse_qr_payload
 from app.services.scrapeyard import scrapeyard_service
 
 
 class TransferService:
+    def _resolve_material_state(
+        self,
+        item: ItemMaster,
+        requested: Optional[MaterialState],
+    ) -> MaterialState:
+        if not item.is_shreddable:
+            return MaterialState.NOT_SHREDDED
+        if requested is None:
+            raise HTTPException(
+                status_code=422,
+                detail="material_state is required for shreddable items",
+            )
+        return requested
+
+    def _enrich_payload_from_item(self, db: Session, payload) -> None:
+        item = item_master_service.get_by_plu_code(db, payload.plu_code or payload.item_code)
+        if not item:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Unknown item code: {payload.plu_code or payload.item_code}",
+            )
+        if item.uom.upper() == "EA":
+            raise HTTPException(
+                status_code=422,
+                detail="EA items must use manual dispatch",
+            )
+        payload.item_name = item.name
+        payload.description = item.name
+        payload.uom = item.uom.upper()
+        payload.plu_code = item.plu_code
+        payload.item_code_8 = item.item_code
+        payload.is_shreddable = item.is_shreddable
+        payload.requires_material_state = item.is_shreddable
+
+    def _transfer_is_shreddable(self, db: Session, transfer: Transfer) -> bool:
+        if transfer.item_master_id:
+            item = (
+                db.query(ItemMaster)
+                .filter(ItemMaster.id == transfer.item_master_id)
+                .first()
+            )
+            if item:
+                return item.is_shreddable
+        if transfer.plu_code:
+            item = item_master_service.get_by_plu_code(db, transfer.plu_code)
+            if item:
+                return item.is_shreddable
+        return False
+
     def scan_qr(
         self,
         db: Session,
@@ -39,6 +94,8 @@ class TransferService:
         logged_in_plant_id: Optional[int] = None,
     ) -> QRScanResponse:
         payload = parse_qr_payload(qr_raw)
+        self._enrich_payload_from_item(db, payload)
+
         existing = (
             db.query(Transfer).filter(Transfer.qr_number == payload.qr_number).first()
         )
@@ -80,18 +137,20 @@ class TransferService:
         return TransferResponse(
             id=transfer.id,
             qr_number=transfer.qr_number,
+            plu_code=transfer.plu_code,
             item_code=transfer.item_code,
             item_name=transfer.item_name,
             description=transfer.description,
             uom=transfer.uom,
             quantity_sent=transfer.quantity_sent,
             quantity_received=transfer.quantity_received,
-            gp_number=transfer.gp_number,
-            gr_number=transfer.gr_number,
             location=transfer.location,
             net_weight=transfer.net_weight,
             tare_weight=transfer.tare_weight,
             gross_weight=transfer.gross_weight,
+            dispatch_method=transfer.dispatch_method,
+            material_state=transfer.material_state,
+            is_shreddable=self._transfer_is_shreddable(db, transfer),
             status=transfer.status,
             dispatched_at=transfer.dispatched_at,
             processed_at=transfer.processed_at,
@@ -128,6 +187,7 @@ class TransferService:
         item_code: Optional[str] = None,
         material_name: Optional[str] = None,
         status: Optional[TransferStatus] = None,
+        material_state: Optional[MaterialState] = None,
         date_from: Optional[int] = None,
         date_to: Optional[int] = None,
         rejected_only: bool = False,
@@ -142,11 +202,16 @@ class TransferService:
             query = query.filter(Transfer.scrapeyard_id == scrapeyard_id)
 
         if item_code:
-            query = query.filter(Transfer.item_code.ilike(f"%{item_code}%"))
+            query = query.filter(
+                (Transfer.item_code.ilike(f"%{item_code}%"))
+                | (Transfer.plu_code.ilike(f"%{item_code}%"))
+            )
         if material_name:
             query = query.filter(Transfer.item_name.ilike(f"%{material_name}%"))
         if status:
             query = query.filter(Transfer.status == status)
+        if material_state:
+            query = query.filter(Transfer.material_state == material_state)
         if rejected_only:
             query = query.filter(Transfer.status == TransferStatus.REJECTED)
         if date_from:
@@ -165,11 +230,15 @@ class TransferService:
             TransferListItem(
                 id=t.id,
                 qr_number=t.qr_number,
+                plu_code=t.plu_code,
                 item_code=t.item_code,
                 item_name=t.item_name,
                 uom=t.uom,
                 quantity_sent=t.quantity_sent,
                 quantity_received=t.quantity_received,
+                dispatch_method=t.dispatch_method,
+                material_state=t.material_state,
+                is_shreddable=self._transfer_is_shreddable(db, t),
                 status=t.status,
                 dispatched_at=t.dispatched_at,
                 processed_at=t.processed_at,
@@ -186,6 +255,15 @@ class TransferService:
     ) -> TransferResponse:
         employee = validate_plant_employee(db, logged_in_plant_id, data.employee_id)
         payload = parse_qr_payload(data.qr_raw)
+        self._enrich_payload_from_item(db, payload)
+
+        item = item_master_service.get_by_plu_code(
+            db, payload.plu_code or payload.item_code
+        )
+        if not item:
+            raise HTTPException(status_code=422, detail="Unknown item code")
+
+        material_state = self._resolve_material_state(item, data.material_state)
 
         if payload.location is None:
             raise HTTPException(
@@ -213,37 +291,110 @@ class TransferService:
 
         scrapeyard = scrapeyard_service.get_active(db)
         now = int(time.time())
+        canonical_item_code = item.item_code or item.plu_code
 
         if existing:
             transfer = existing
-            transfer.gp_number = data.gp_number
             transfer.status = TransferStatus.DISPATCHED
             transfer.dispatched_by = employee.id
             transfer.dispatched_at = now
             transfer.scrapeyard_id = scrapeyard.id
             transfer.shopfloor_plant_id = qr_plant.id
+            transfer.item_master_id = item.id
+            transfer.plu_code = item.plu_code
+            transfer.item_code = canonical_item_code
+            transfer.item_name = item.name
+            transfer.description = item.name
+            transfer.uom = item.uom.upper()
+            transfer.quantity_sent = payload.quantity
+            transfer.material_state = material_state
+            transfer.dispatch_method = DispatchMethod.QR
         else:
             transfer = Transfer(
                 qr_raw=data.qr_raw,
                 qr_number=payload.qr_number,
                 shopfloor_plant_id=qr_plant.id,
                 scrapeyard_id=scrapeyard.id,
-                item_code=payload.item_code,
-                item_name=payload.item_name,
-                description=payload.description,
-                uom=payload.uom,
+                item_master_id=item.id,
+                plu_code=item.plu_code,
+                item_code=canonical_item_code,
+                item_name=item.name,
+                description=item.name,
+                uom=item.uom.upper(),
                 quantity_sent=payload.quantity,
-                gp_number=data.gp_number,
                 location=payload.location,
                 net_weight=payload.net_weight,
                 tare_weight=payload.tare_weight,
                 gross_weight=payload.gross_weight,
+                dispatch_method=DispatchMethod.QR,
+                material_state=material_state,
                 status=TransferStatus.DISPATCHED,
                 dispatched_by=employee.id,
                 dispatched_at=now,
             )
             db.add(transfer)
             db.flush()
+
+        db.add(
+            TransferEvent(
+                transfer_id=transfer.id,
+                event_type=TransferEventType.DISPATCHED,
+                actor_role=ActorRole.SHOPFLOOR,
+                employee_profile_id=employee.id,
+                employee_name=employee.name,
+                quantity=transfer.quantity_sent,
+                created_at=now,
+            )
+        )
+        db.commit()
+        db.refresh(transfer)
+        return self._build_response(db, transfer)
+
+    def dispatch_manual(
+        self,
+        db: Session,
+        logged_in_plant_id: int,
+        data: ManualDispatchRequest,
+    ) -> TransferResponse:
+        employee = validate_plant_employee(db, logged_in_plant_id, data.employee_id)
+        item = item_master_service.get_by_id(db, data.item_master_id)
+
+        if item.uom.upper() != "EA":
+            raise HTTPException(
+                status_code=422,
+                detail="KG items must use QR dispatch",
+            )
+
+        material_state = self._resolve_material_state(item, data.material_state)
+        scrapeyard = scrapeyard_service.get_active(db)
+        now = int(time.time())
+        canonical_item_code = item.item_code or item.plu_code
+        qr_raw = (
+            f"MANUAL DISPATCH\nPLU: {item.plu_code}\nNAME: {item.name}\n"
+            f"QTY: {data.quantity}\nPLANT: {logged_in_plant_id}\nAT: {now}"
+        )
+        qr_number = hashlib.sha256(qr_raw.encode()).hexdigest()[:16]
+
+        transfer = Transfer(
+            qr_raw=qr_raw,
+            qr_number=qr_number,
+            shopfloor_plant_id=logged_in_plant_id,
+            scrapeyard_id=scrapeyard.id,
+            item_master_id=item.id,
+            plu_code=item.plu_code,
+            item_code=canonical_item_code,
+            item_name=item.name,
+            description=item.name,
+            uom=item.uom.upper(),
+            quantity_sent=data.quantity,
+            dispatch_method=DispatchMethod.MANUAL,
+            material_state=material_state,
+            status=TransferStatus.DISPATCHED,
+            dispatched_by=employee.id,
+            dispatched_at=now,
+        )
+        db.add(transfer)
+        db.flush()
 
         db.add(
             TransferEvent(
@@ -283,7 +434,6 @@ class TransferService:
         now = int(time.time())
         transfer.status = TransferStatus.ACCEPTED
         transfer.quantity_received = transfer.quantity_sent
-        transfer.gr_number = data.gr_number
         transfer.processed_by = employee.id
         transfer.processed_at = now
         if not transfer.scrapeyard_id:

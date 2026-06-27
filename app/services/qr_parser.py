@@ -40,6 +40,13 @@ def _normalize_key(key: str) -> str:
     return re.sub(r"\s+", " ", key.strip().upper())
 
 
+def normalize_plu_code(value: str) -> str:
+    value = value.strip().upper()
+    if value.isdigit():
+        return str(int(value))
+    return value
+
+
 def parse_qr_payload(qr_raw: str) -> QRPayload:
     if not qr_raw or not qr_raw.strip():
         raise HTTPException(status_code=422, detail="QR payload is empty")
@@ -51,12 +58,10 @@ def parse_qr_payload(qr_raw: str) -> QRPayload:
     normalized = {_normalize_key(k): v for k, v in data.items()}
 
     item_code = normalized.get("CODE")
+    if not item_code:
+        raise HTTPException(status_code=422, detail="QR payload must include CODE")
+
     description = normalized.get("DESCRIPTION")
-    if not item_code or not description:
-        raise HTTPException(
-            status_code=422,
-            detail="QR payload must include CODE and DESCRIPTION",
-        )
 
     net_weight = _parse_weight(normalized.get("NET WT.", normalized.get("NET WT", "")))
     tare_weight = _parse_weight(
@@ -83,6 +88,7 @@ def parse_qr_payload(qr_raw: str) -> QRPayload:
     time_str = normalized.get("TIME")
 
     qr_number = hashlib.sha256(qr_raw.encode()).hexdigest()[:16]
+    plu_code = normalize_plu_code(item_code)
 
     return QRPayload(
         qr_number=qr_number,
@@ -97,4 +103,5 @@ def parse_qr_payload(qr_raw: str) -> QRPayload:
         quantity=quantity,
         date_str=date_str,
         time_str=time_str,
+        plu_code=plu_code,
     )
