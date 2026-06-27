@@ -8,6 +8,22 @@ Health check: `GET /` (public) → `{ "status": "DigiScrapyard API is running" }
 
 ---
 
+## Recent updates (June 2026) — frontend checklist
+
+| Area | What changed |
+|------|----------------|
+| **P-items** | 7 shreddable PLU codes (`P159`, `P106`, `PB06`, `PC06`, `P153`, `P100`, `P177`) use a **pre-shred identity** — show PLU + display name until shredded |
+| **Scan / transfer fields** | New `is_p_item` on scan payload and all transfer responses; `item_code_8` is **`null` for P-items** |
+| **Shred workflow** | New scrapeyard endpoints: `POST /v1/scrapeyard/shred`, `GET /v1/scrapeyard/shred-log`, `GET /v1/scrapeyard/shred-log/{id}` |
+| **Display rules** | Normal items: `item_code` = 8-digit SAP code. P-items: `item_code` = PLU (e.g. `P159`), `item_name` = display name (e.g. `Cartons`) |
+| **8-digit after shred** | Only appears in **shred log** (`output_item_code`, `output_name`) — not on the transfer itself |
+| **Material state** | Required on QR dispatch when `is_shreddable: true` (all P-items). `1499 GARBAGE` is **not** shreddable |
+| **Admin items** | Item master responses include `is_p_item`, `shred_output_item_code`, `shred_output_name` |
+
+**Scrapeyard P-item UI flow:** scan → accept → **shred save** (new screen) → shred log lists 8-digit output.
+
+---
+
 ## Architecture overview
 
 - **3 shopfloor plants** (UDE, UTE, U535) — each has its own login and employees
@@ -59,6 +75,31 @@ GROSS WT.: 7.350 Kg
 - **Normal KG items** — transfer shows 8-digit SAP `item_code` and mapped name from `item_master`
 - **P-items** — transfer shows PLU code (e.g. `P159`) and P-list display name (e.g. `Cartons`); 8-digit code is **not** exposed on scan/dispatch/accept/reject
 - After shredding at scrapeyard, `POST /v1/scrapeyard/shred` records the 8-digit output in `shred_log`
+
+### P-item reference (shreddable PLUs)
+
+| PLU | Display name (show in UI) | After shred — 8-digit | After shred — name |
+|-----|---------------------------|----------------------|-------------------|
+| P159 | Cartons | 1000091259 | CARTONS -JT |
+| P106 | Bottles & Caps | 1000090406 | LIQUID MIX BOTTLE & CAPS SCRAP |
+| PB06 | Bottles | 1000090406 | LIQUID MIX BOTTLE & CAPS SCRAP |
+| PC06 | Caps | 1000090406 | LIQUID MIX BOTTLE & CAPS SCRAP |
+| P153 | Tubes | 1000091253 | TUBE CUTTING-JT |
+| P100 | Squeezed Tubes | 1000090402 | Empty Tube Scrap |
+| P177 | Laminates | 1000090077 | SHREDED LAMINATES |
+
+> **Note:** `1259` (CARTONS -JT) is a **normal** KG item with 8-digit `1000091259` — not a P-item. `P159` is the pre-shred carton P-code.
+
+### Frontend display rules
+
+| Context | Normal item | P-item (`is_p_item: true`) |
+|---------|-------------|----------------------------|
+| Scan `payload.item_name` | Mapped name from DB | P-list display name |
+| Scan `payload.item_code_8` | 8-digit SAP code | **`null`** — do not show |
+| Scan `payload.plu_code` | PLU from QR | PLU from QR |
+| Transfer `item_code` | 8-digit SAP code | PLU code (e.g. `P159`) |
+| Transfer `item_name` | Mapped name | P-list display name |
+| After shred | N/A | Read `output_item_code` / `output_name` from shred log |
 
 **Client-confirmed PLU → 8-digit overrides** (applied during import): `1402`, `1081`, `1430`, `1763`, `1313`, `1259`, `1750`, `1253`, `1314`, `1021` — see `app/constants/items.py`. Multiple PLUs may share the same 8-digit SAP code (e.g. `1402` and `1253` → `1000091253`).
 
@@ -177,6 +218,8 @@ Authorization: Bearer <access_token>
 | `GET /v1/transfers/history` | ✓ | ✓ | ✓ |
 | `GET /v1/transfers/{id}` | ✓ | ✓ | ✓ |
 | `POST /v1/shopfloor/dispatch` | ✓ | | |
+| `GET /v1/shopfloor/items` | ✓ | | |
+| `POST /v1/shopfloor/dispatch/manual` | ✓ | | |
 | `GET /v1/shopfloor/rejected` | ✓ | | |
 | `POST /v1/shopfloor/rejected/{id}/acknowledge` | ✓ | | |
 | `POST /v1/scrapeyard/accept` | | ✓ | |
@@ -193,6 +236,9 @@ Authorization: Bearer <access_token>
 | `GET /v1/scrapeyard-config` | | | ✓ |
 | `PATCH /v1/scrapeyard-config` | | | ✓ |
 | `GET /v1/reporting/*` | | | ✓ |
+| `GET /v1/items` | | | ✓ |
+| `POST /v1/items` | | | ✓ |
+| `GET /v1/vendors` | | | ✓ |
 | `GET /v1/sales` | | | ✓ |
 | `POST /v1/sales` | | | ✓ |
 
@@ -236,6 +282,10 @@ sequenceDiagram
     alt Accept
         SY->>API: POST /v1/scrapeyard/accept
         API-->>SY: status=accepted
+        opt P-item (is_p_item=true)
+            SY->>API: POST /v1/scrapeyard/shred
+            API-->>SY: shred log with output_item_code
+        end
     else Reject
         SY->>API: POST /v1/scrapeyard/reject
         API-->>SY: status=rejected
@@ -244,7 +294,7 @@ sequenceDiagram
     end
 ```
 
-**Scrapeyard UX:** after scan, use `existing_transfer_id` and `existing_status` (`dispatched`) to drive accept/reject. Pass that `transfer_id` to accept/reject endpoints.
+**Scrapeyard UX:** after scan, use `existing_transfer_id` and `existing_status` (`dispatched`) to drive accept/reject. Pass that `transfer_id` to accept/reject endpoints. For **P-items** (`is_p_item: true` on scan payload), after accept show a **Shred Save** action that calls `POST /v1/scrapeyard/shred`.
 
 ### 1. Scan QR
 
@@ -263,6 +313,7 @@ sequenceDiagram
     "plu_code": "1313",
     "item_code_8": "1000090313",
     "item_name": "CORRUGATED BOX SCRAP",
+    "is_p_item": false,
     "is_shreddable": false,
     "requires_material_state": false,
     "location": 3,
@@ -290,6 +341,31 @@ sequenceDiagram
 - **`plant_match`:** `true` / `false` for **shopfloor** only (logged-in plant vs QR location).
 - **Scrapeyard:** `plant_match` is `null`; use `existing_transfer_id` when a transfer already exists.
 - Returns **422** if PLU code is unknown or item UOM is `EA` (use manual dispatch).
+- **`is_p_item`:** when `true`, `item_code_8` is `null` — use `item_name` + `plu_code` for display.
+- **`requires_material_state`:** when `true`, dispatch must include `material_state` (`shredded` | `not_shredded`).
+
+**P-item scan example** (`CODE: P159`):
+```json
+{
+  "payload": {
+    "qr_number": "a1b2c3d4e5f6g7h8",
+    "item_code": "P159",
+    "plu_code": "P159",
+    "item_code_8": null,
+    "item_name": "Cartons",
+    "is_p_item": true,
+    "is_shreddable": true,
+    "requires_material_state": true,
+    "uom": "KG",
+    "quantity": "12.000",
+    "location": 3
+  },
+  "resolved_plant": { "id": 1, "login_id": "UDE", "qr_location": 3 },
+  "plant_match": true,
+  "existing_transfer_id": null,
+  "existing_status": null
+}
+```
 
 ### 2. Dispatch — QR (Shopfloor, KG items)
 
@@ -310,7 +386,23 @@ Returns **403** if QR location plant does not match logged-in plant. Returns **4
 
 ### 2b. Dispatch — Manual (Shopfloor, EA items)
 
-`GET /v1/shopfloor/items` — list active EA items for dropdowns.
+`GET /v1/shopfloor/items` — list active EA items for manual dispatch dropdowns.
+
+**Response:**
+```json
+{
+  "items": [
+    {
+      "id": 12,
+      "plu_code": "1021",
+      "item_code": "1000090021",
+      "name": "EMPTY IRON DRUM 200LTR",
+      "uom": "EA",
+      "is_shreddable": false
+    }
+  ]
+}
+```
 
 `POST /v1/shopfloor/dispatch/manual`
 ```json
@@ -402,9 +494,40 @@ Validation: transfer must be `accepted`, `is_p_item=true`, and no existing shred
 }
 ```
 
-`GET /v1/scrapeyard/shred-log` — list for logged-in scrapeyard. Query: `output_item_code`, `date_from`, `date_to` (unix seconds), `page`, `page_size`.
+`GET /v1/scrapeyard/shred-log` — list for logged-in scrapeyard.
 
-`GET /v1/scrapeyard/shred-log/{id}` — single entry detail.
+Query params: `output_item_code`, `date_from`, `date_to` (unix seconds), `page`, `page_size`.
+
+**List response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 1,
+      "transfer_id": 42,
+      "scrapeyard_id": 1,
+      "input_plu_code": "P159",
+      "input_name": "Cartons",
+      "output_item_code": "1000091259",
+      "output_name": "CARTONS -JT",
+      "quantity_kg": "12.000",
+      "shredded_at": 1782396300
+    }
+  ]
+}
+```
+
+`GET /v1/scrapeyard/shred-log/{id}` — single entry detail (same object shape as list item).
+
+**Shred errors:**
+
+| Code | When |
+|------|------|
+| 400 | Transfer not `accepted`; transfer is not a P-item (`is_p_item: false`) |
+| 404 | Transfer or shred log entry not found |
+| 409 | Shred log already exists for this transfer |
+| 422 | P-item has no shred output mapping configured |
 
 ### 5. Acknowledge rejection (Shopfloor)
 
@@ -471,6 +594,31 @@ No request body. Returns **400** if transfer is not in `rejected` status.
 
 When rejected, `rejection` contains `reason_type`, `qty_received`, `material_received_name`, `comment`.
 
+**P-item transfer example** (accepted P159 — note `item_code` is PLU, not 8-digit):
+```json
+{
+  "id": 42,
+  "qr_number": "a1b2c3d4e5f6g7h8",
+  "plu_code": "P159",
+  "item_code": "P159",
+  "item_name": "Cartons",
+  "uom": "KG",
+  "quantity_sent": "12.000",
+  "quantity_received": "12.000",
+  "dispatch_method": "qr",
+  "material_state": "not_shredded",
+  "is_p_item": true,
+  "is_shreddable": true,
+  "status": "accepted",
+  "dispatched_at": 1782396208,
+  "processed_at": 1782396216,
+  "events": [],
+  "rejection": null
+}
+```
+
+The 8-digit identity (`1000091259` / `CARTONS -JT`) appears only after calling `POST /v1/scrapeyard/shred` — fetch from shred log, not from this transfer object.
+
 ### History list item (slimmer)
 
 ```json
@@ -531,9 +679,27 @@ GET /v1/transfers/history?page=1&page_size=50&status=accepted&date_from=2026-01-
   "item_code": "1000090313",
   "name": "CORRUGATED BOX SCRAP",
   "uom": "KG",
-  "is_shreddable": false
+  "is_shreddable": false,
+  "is_p_item": false
 }
 ```
+
+**P-item create example** (no `item_code` until shredded; shred output configured on master):
+```json
+{
+  "plu_code": "P159",
+  "name": "Cartons",
+  "uom": "KG",
+  "is_shreddable": true,
+  "is_p_item": true,
+  "shred_output_item_code": "1000091259",
+  "shred_output_name": "CARTONS -JT"
+}
+```
+
+**Item response fields** (list + detail): `id`, `plu_code`, `item_code` (null for P-items), `name`, `uom`, `is_shreddable`, `is_p_item`, `shred_output_item_code`, `shred_output_name`, `is_active`, `created_at`, `updated_at`.
+
+> Multiple PLUs may share the same `item_code` (8-digit SAP code) — e.g. `1402` and `1253` both use `1000091253`.
 
 `GET /v1/items/{id}` · `PATCH /v1/items/{id}` · `DELETE /v1/items/{id}` (soft delete)
 
@@ -794,12 +960,12 @@ Recording a sale sets the transfer `status` to **`sold`**.
 
 | Code | Meaning |
 |------|---------|
-| 400 | Invalid employee for plant/scrapeyard; only **accepted** transfers can be sold; only **rejected** transfers can be acknowledged |
+| 400 | Invalid employee for plant/scrapeyard; only **accepted** transfers can be sold or shredded; only **rejected** transfers can be acknowledged; shred only for P-items |
 | 401 | Missing/invalid token; invalid login credentials |
 | 403 | Wrong role; transfer not for this plant/scrapeyard; shopfloor plant does not match QR location |
-| 404 | Resource not found |
-| 409 | Duplicate QR (`QR already used with status …`); duplicate login ID |
-| 422 | Bad QR payload; missing rejection fields (`qty_received`, `material_received_name`, `comment`) |
+| 404 | Resource not found (transfer, shred log, etc.) |
+| 409 | Duplicate QR (`QR already used with status …`); duplicate login ID; **shred log already exists for transfer** |
+| 422 | Bad QR payload; missing rejection fields; missing `material_state` for shreddable items; P-item missing shred output mapping |
 
 Error body: `{ "detail": "<message>" }`
 
@@ -820,16 +986,19 @@ Exception: `GET /v1/reporting/recent-transfers` uses `limit` instead of paginati
 ```
 pending → dispatched → accepted → sold
                     ↘ rejected → acknowledged
+                    ↘ accepted (P-item) → shred log recorded (transfer stays accepted)
 ```
 
 | Status | Meaning |
 |--------|---------|
 | `pending` | QR reserved, not yet dispatched |
 | `dispatched` | Sent from shopfloor, awaiting scrapeyard |
-| `accepted` | Scrapeyard accepted |
+| `accepted` | Scrapeyard accepted — for P-items, call `POST /v1/scrapeyard/shred` to record 8-digit output |
 | `rejected` | Scrapeyard rejected |
 | `acknowledged` | Shopfloor acknowledged rejection |
 | `sold` | Admin recorded sale |
+
+**P-item note:** shredding does **not** change transfer `status`. The shred is a separate `shred_log` record linked by `transfer_id`.
 
 ---
 
