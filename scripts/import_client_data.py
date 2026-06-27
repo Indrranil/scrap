@@ -102,10 +102,9 @@ def _resolve_item_code(
     owner = assigned_codes.get(code)
     if owner and owner != plu_code:
         print(
-            f"  WARNING: PLU {plu_code} ({name}) skipped item_code {code} "
-            f"— already used by PLU {owner}"
+            f"  NOTE: PLU {plu_code} ({name}) shares item_code {code} "
+            f"with PLU {owner}"
         )
-        return None, None, None
 
     assigned_codes[code] = plu_code
     return code, None, None
@@ -219,33 +218,34 @@ def import_vendors(db: Session, client_data_path: str) -> None:
             db.flush()
 
         for item_code_8, name, _uom, rate in items:
-            item = (
+            matching_items = (
                 db.query(ItemMaster)
                 .filter(ItemMaster.item_code == item_code_8)
-                .first()
+                .all()
             )
-            if not item:
+            if not matching_items:
                 skipped.append(f"{vendor_name} | {item_code_8} | {name}")
                 continue
 
-            existing = (
-                db.query(VendorItem)
-                .filter(
-                    VendorItem.vendor_id == vendor.id,
-                    VendorItem.item_id == item.id,
-                )
-                .first()
-            )
-            if existing:
-                existing.rate_inr = rate
-            else:
-                db.add(
-                    VendorItem(
-                        vendor_id=vendor.id,
-                        item_id=item.id,
-                        rate_inr=rate,
+            for item in matching_items:
+                existing = (
+                    db.query(VendorItem)
+                    .filter(
+                        VendorItem.vendor_id == vendor.id,
+                        VendorItem.item_id == item.id,
                     )
+                    .first()
                 )
+                if existing:
+                    existing.rate_inr = rate
+                else:
+                    db.add(
+                        VendorItem(
+                            vendor_id=vendor.id,
+                            item_id=item.id,
+                            rate_inr=rate,
+                        )
+                    )
 
     db.commit()
     print(f"Imported/updated {len(blocks)} vendor blocks")

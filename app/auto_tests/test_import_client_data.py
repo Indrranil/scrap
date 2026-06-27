@@ -41,17 +41,12 @@ def test_p_item_has_no_item_code_but_shred_output():
     assert shred_out_name == "CARTONS -JT"
 
 
-def test_conflict_guard_skips_duplicate_8digit_assignment():
-    assigned = {"1000091259": "1259"}
-    item_code, _, _ = _resolve_item_code(
-        "1313", "CORRUGATED BOX SCRAP", {"CORRUGATED BOX SCRAP": "1000090313"}, assigned
-    )
-    assert item_code == "1000090313"
-
-    item_code, _, _ = _resolve_item_code(
-        "9999", "CARTONS -JT", {"CARTONS -JT": "1000091259"}, assigned
-    )
-    assert item_code is None
+def test_shared_item_code_allowed_across_plus():
+    assigned: dict[str, str] = {}
+    code_a, _, _ = _resolve_item_code("1402", "TUBE CUTTING SCRAP", {}, assigned)
+    code_b, _, _ = _resolve_item_code("1253", "TUBE CUTTING-JT", {}, assigned)
+    assert code_a == "1000091253"
+    assert code_b == "1000091253"
 
 
 def test_excel_files_load_without_db_collision():
@@ -67,9 +62,7 @@ def test_excel_files_load_without_db_collision():
     assert len(rates) > 0
 
     assigned: dict[str, str] = {}
-    codes_seen: set[str] = set()
     for plu_code, name, _uom in plu_rows:
         item_code, _, _ = _resolve_item_code(plu_code, name, rates, assigned)
-        if item_code:
-            assert item_code not in codes_seen, f"duplicate 8-digit for PLU {plu_code}"
-            codes_seen.add(item_code)
+        if item_code and plu_code in PLU_ITEM_CODE_OVERRIDES:
+            assert item_code == PLU_ITEM_CODE_OVERRIDES[plu_code]

@@ -76,13 +76,6 @@ class ItemMasterService:
         plu_code = normalize_plu_code(data.plu_code)
         if db.query(ItemMaster).filter(ItemMaster.plu_code == plu_code).first():
             raise HTTPException(status_code=409, detail="PLU code already exists")
-        if data.item_code:
-            if (
-                db.query(ItemMaster)
-                .filter(ItemMaster.item_code == data.item_code)
-                .first()
-            ):
-                raise HTTPException(status_code=409, detail="Item code already exists")
 
         now = int(time.time())
         item = ItemMaster(
@@ -121,19 +114,6 @@ class ItemMasterService:
                 raise HTTPException(status_code=409, detail="PLU code already exists")
             item.plu_code = plu_code
         if data.item_code is not None:
-            if data.item_code:
-                existing = (
-                    db.query(ItemMaster)
-                    .filter(
-                        ItemMaster.item_code == data.item_code,
-                        ItemMaster.id != item_id,
-                    )
-                    .first()
-                )
-                if existing:
-                    raise HTTPException(
-                        status_code=409, detail="Item code already exists"
-                    )
             item.item_code = data.item_code or None
         if data.name is not None:
             item.name = data.name.strip()

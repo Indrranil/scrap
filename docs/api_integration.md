@@ -60,7 +60,7 @@ GROSS WT.: 7.350 Kg
 - **P-items** — transfer shows PLU code (e.g. `P159`) and P-list display name (e.g. `Cartons`); 8-digit code is **not** exposed on scan/dispatch/accept/reject
 - After shredding at scrapeyard, `POST /v1/scrapeyard/shred` records the 8-digit output in `shred_log`
 
-**Client-confirmed PLU → 8-digit overrides** (applied during import): `1402`, `1081`, `1430`, `1763`, `1313`, `1259` — see `app/constants/items.py`.
+**Client-confirmed PLU → 8-digit overrides** (applied during import): `1402`, `1081`, `1430`, `1763`, `1313`, `1259`, `1750`, `1253`, `1314`, `1021` — see `app/constants/items.py`. Multiple PLUs may share the same 8-digit SAP code (e.g. `1402` and `1253` → `1000091253`).
 
 **Import files:** `upated_itemcode.xlsx` (PLU list) and `updated_8digit.xlsx` (vendor rates). Run `python scripts/import_client_data.py` after deploy.
 

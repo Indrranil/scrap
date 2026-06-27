@@ -44,7 +44,7 @@ Table employee_profile {
 Table item_master {
   id int [pk, increment]
   plu_code varchar(20) [not null, unique, note: '4-digit / alphanumeric code from QR']
-  item_code varchar(20) [unique, note: '8-digit SAP code; NULL for P-items']
+  item_code varchar(20) [note: '8-digit SAP code; NULL for P-items; may be shared across PLUs']
   name varchar(500) [not null]
   uom varchar(10) [not null]
   is_shreddable boolean [not null, default: false]
