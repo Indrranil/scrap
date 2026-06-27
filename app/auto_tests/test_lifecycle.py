@@ -6,7 +6,7 @@ from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
 
 from app.auto_tests.conftest import SAMPLE_QR, SAMPLE_QR_UTE
-from app.auto_tests.item_fixtures import seed_ea_item, seed_test_item
+from app.auto_tests.item_fixtures import seed_ea_item, seed_p_item, seed_test_item
 
 
 def _create_scrapeyard(db):
@@ -254,12 +254,12 @@ LOCATION: 3"""
 
 
 def test_shreddable_item_requires_material_state(client, db_session):
-    seed_test_item(
+    seed_p_item(
         db_session,
         plu_code="P106",
-        item_code="1000090406",
         name="Bottles & Caps",
-        is_shreddable=True,
+        shred_output_item_code="1000090406",
+        shred_output_name="LIQUID MIX BOTTLE & CAPS SCRAP",
     )
     _create_scrapeyard(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
@@ -295,6 +295,99 @@ GROSS WT.: 5.000 Kg"""
     assert dispatch.status_code == 200
     assert dispatch.json()["material_state"] == "shredded"
     assert dispatch.json()["is_shreddable"] is True
+    assert dispatch.json()["is_p_item"] is True
+    assert dispatch.json()["item_code"] == "P106"
+    assert dispatch.json()["item_name"] == "Bottles & Caps"
+
+
+def test_p_item_dispatch_hides_8digit_until_shred(client, db_session):
+    seed_p_item(db_session)
+    sy, sy_emp = _create_scrapeyard(db_session)
+    ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+
+    p_qr = """HIDUSTAN UNILEVER LIMITED
+DATE: 23-06-2026
+TIME: 09:22:02
+CODE: P159
+LOCATION: 3
+NET WT.: 12.000 Kg
+GROSS WT.: 12.000 Kg"""
+
+    ude_token = client.post(
+        "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
+    ).json()["access_token"]
+
+    scan = client.post(
+        "/v1/transfers/scan",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={"qr_raw": p_qr},
+    )
+    assert scan.status_code == 200
+    payload = scan.json()["payload"]
+    assert payload["item_name"] == "Cartons"
+    assert payload["is_p_item"] is True
+    assert payload["item_code_8"] is None
+
+    dispatch = client.post(
+        "/v1/shopfloor/dispatch",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={
+            "qr_raw": p_qr,
+            "employee_id": ude_emp.id,
+            "material_state": "not_shredded",
+        },
+    )
+    assert dispatch.status_code == 200
+    body = dispatch.json()
+    assert body["item_code"] == "P159"
+    assert body["item_name"] == "Cartons"
+    assert body["is_p_item"] is True
+    transfer_id = body["id"]
+
+    sy_token = client.post(
+        "/v1/auth/login", json={"login_id": "SCRAP", "password": "1234"}
+    ).json()["access_token"]
+
+    accept = client.post(
+        "/v1/scrapeyard/accept",
+        headers={"Authorization": f"Bearer {sy_token}"},
+        json={"transfer_id": transfer_id, "employee_id": sy_emp.id},
+    )
+    assert accept.status_code == 200
+    assert accept.json()["item_name"] == "Cartons"
+    assert accept.json()["item_code"] == "P159"
+
+    shred = client.post(
+        "/v1/scrapeyard/shred",
+        headers={"Authorization": f"Bearer {sy_token}"},
+        json={
+            "transfer_id": transfer_id,
+            "quantity_kg": "12.000",
+            "employee_id": sy_emp.id,
+        },
+    )
+    assert shred.status_code == 201
+    log = shred.json()
+    assert log["input_plu_code"] == "P159"
+    assert log["input_name"] == "Cartons"
+    assert log["output_item_code"] == "1000091259"
+    assert log["output_name"] == "CARTONS -JT"
+    assert log["quantity_kg"] == "12.000"
+
+    logs = client.get(
+        "/v1/scrapeyard/shred-log",
+        headers={"Authorization": f"Bearer {sy_token}"},
+    )
+    assert logs.status_code == 200
+    assert logs.json()["total"] == 1
+    assert logs.json()["items"][0]["id"] == log["id"]
+
+    detail = client.get(
+        f"/v1/scrapeyard/shred-log/{log['id']}",
+        headers={"Authorization": f"Bearer {sy_token}"},
+    )
+    assert detail.status_code == 200
+    assert detail.json()["output_item_code"] == "1000091259"
 
 
 def test_admin_plant_crud(client, db_session):

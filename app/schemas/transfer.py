@@ -27,6 +27,7 @@ class QRPayload(BaseModel):
     time_str: Optional[str] = None
     plu_code: Optional[str] = None
     item_code_8: Optional[str] = None
+    is_p_item: bool = False
     is_shreddable: bool = False
     requires_material_state: bool = False
 
@@ -117,6 +118,7 @@ class TransferResponse(BaseModel):
     gross_weight: Optional[Decimal] = None
     dispatch_method: DispatchMethod
     material_state: MaterialState
+    is_p_item: bool = False
     is_shreddable: bool = False
     status: TransferStatus
     dispatched_at: Optional[int] = None
@@ -140,6 +142,7 @@ class TransferListItem(BaseModel):
     quantity_received: Optional[Decimal] = None
     dispatch_method: DispatchMethod
     material_state: MaterialState
+    is_p_item: bool = False
     is_shreddable: bool = False
     status: TransferStatus
     dispatched_at: Optional[int] = None

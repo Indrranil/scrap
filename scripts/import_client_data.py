@@ -3,8 +3,8 @@
 
 Usage:
     python scripts/import_client_data.py \\
-        --item-code /path/to/Item\\ Code.xlsx \\
-        --client-data /path/to/client_data.xlsx
+        --item-code upated_itemcode.xlsx \\
+        --client-data updated_8digit.xlsx
 """
 
 from __future__ import annotations
@@ -14,7 +14,6 @@ import os
 import sys
 import time
 from decimal import Decimal
-from difflib import SequenceMatcher
 from typing import Dict, List, Optional, Tuple
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -23,7 +22,14 @@ if ROOT not in sys.path:
 
 from sqlalchemy.orm import Session
 
-from app.constants.items import SHREDDABLE_PLU_CODES, SKIP_VENDOR_ITEM_NAMES
+from app.constants.items import (
+    DEFAULT_CLIENT_DATA_XLSX,
+    DEFAULT_ITEM_CODE_XLSX,
+    P_ITEM_SHRED_OUTPUTS,
+    PLU_ITEM_CODE_OVERRIDES,
+    SHREDDABLE_PLU_CODES,
+    SKIP_VENDOR_ITEM_NAMES,
+)
 from app.database.connection import SessionLocal
 from app.models.item_master import ItemMaster
 from app.models.vendor import Vendor
@@ -42,10 +48,6 @@ def _normalize_name(name: str) -> str:
     return " ".join(name.upper().split())
 
 
-def _name_similarity(a: str, b: str) -> float:
-    return SequenceMatcher(None, _normalize_name(a), _normalize_name(b)).ratio()
-
-
 def _load_plu_rows(path: str) -> List[Tuple[str, str, str]]:
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb["PLU"]
@@ -53,7 +55,9 @@ def _load_plu_rows(path: str) -> List[Tuple[str, str, str]]:
     for row in ws.iter_rows(min_row=2, values_only=True):
         if not row[1]:
             continue
-        plu = normalize_plu_code(str(int(row[1])) if isinstance(row[1], float) else str(row[1]))
+        plu = normalize_plu_code(
+            str(int(row[1])) if isinstance(row[1], float) else str(row[1])
+        )
         name = str(row[2]).strip()
         uom = str(row[3]).strip().upper()
         rows.append((plu, name, uom))
@@ -61,37 +65,50 @@ def _load_plu_rows(path: str) -> List[Tuple[str, str, str]]:
     return rows
 
 
-def _load_rates_pdf(path: str) -> Dict[str, Tuple[str, str, Decimal]]:
-    """Map normalized item name -> (8-digit code, uom, rate)."""
+def _load_rates_pdf(path: str) -> Dict[str, str]:
+    """Map normalized item name -> 8-digit code (exact names only)."""
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb["Rates PDF"]
-    mapping: Dict[str, Tuple[str, str, Decimal]] = {}
+    mapping: Dict[str, str] = {}
     for row in ws.iter_rows(min_row=2, values_only=True):
-        if not row[0] or not row[1]:
+        if len(row) < 2 or not row[0] or not row[1]:
             continue
         code = str(int(row[0]))
         name = str(row[1]).strip()
-        uom = str(row[2]).strip().upper()
-        rate = Decimal(str(row[3]))
-        mapping[_normalize_name(name)] = (code, uom, rate)
+        mapping[_normalize_name(name)] = code
     wb.close()
     return mapping
 
 
-def _match_item_code(name: str, rates: Dict[str, Tuple[str, str, Decimal]]) -> Optional[str]:
-    key = _normalize_name(name)
-    if key in rates:
-        return rates[key][0]
-    best_code = None
-    best_score = 0.0
-    for rate_name, (code, _uom, _rate) in rates.items():
-        score = _name_similarity(name, rate_name)
-        if score > best_score:
-            best_score = score
-            best_code = code
-    if best_score >= 0.85:
-        return best_code
-    return None
+def _resolve_item_code(
+    plu_code: str,
+    name: str,
+    rates: Dict[str, str],
+    assigned_codes: Dict[str, str],
+) -> Tuple[Optional[str], Optional[str], Optional[str]]:
+    """Return (item_code, shred_output_code, shred_output_name)."""
+    if plu_code in P_ITEM_SHRED_OUTPUTS:
+        out_code, out_name = P_ITEM_SHRED_OUTPUTS[plu_code]
+        return None, out_code, out_name
+
+    if plu_code in PLU_ITEM_CODE_OVERRIDES:
+        code = PLU_ITEM_CODE_OVERRIDES[plu_code]
+    else:
+        code = rates.get(_normalize_name(name))
+
+    if not code:
+        return None, None, None
+
+    owner = assigned_codes.get(code)
+    if owner and owner != plu_code:
+        print(
+            f"  WARNING: PLU {plu_code} ({name}) skipped item_code {code} "
+            f"— already used by PLU {owner}"
+        )
+        return None, None, None
+
+    assigned_codes[code] = plu_code
+    return code, None, None
 
 
 def import_items(db: Session, item_code_path: str, client_data_path: str) -> None:
@@ -99,10 +116,14 @@ def import_items(db: Session, item_code_path: str, client_data_path: str) -> Non
     rates = _load_rates_pdf(client_data_path)
     now = int(time.time())
     unmatched: List[str] = []
+    assigned_codes: Dict[str, str] = {}
 
     for plu_code, name, uom in plu_rows:
-        item_code = _match_item_code(name, rates)
-        if not item_code:
+        item_code, shred_out_code, shred_out_name = _resolve_item_code(
+            plu_code, name, rates, assigned_codes
+        )
+        is_p_item = plu_code in P_ITEM_SHRED_OUTPUTS
+        if not is_p_item and not item_code:
             unmatched.append(f"{plu_code} | {name}")
 
         existing = db.query(ItemMaster).filter(ItemMaster.plu_code == plu_code).first()
@@ -110,6 +131,9 @@ def import_items(db: Session, item_code_path: str, client_data_path: str) -> Non
             existing.name = name
             existing.uom = uom
             existing.item_code = item_code
+            existing.is_p_item = is_p_item
+            existing.shred_output_item_code = shred_out_code
+            existing.shred_output_name = shred_out_name
             existing.is_shreddable = plu_code in SHREDDABLE_PLU_CODES
             existing.is_active = True
             existing.updated_at = now
@@ -121,11 +145,16 @@ def import_items(db: Session, item_code_path: str, client_data_path: str) -> Non
                     name=name,
                     uom=uom,
                     is_shreddable=plu_code in SHREDDABLE_PLU_CODES,
+                    is_p_item=is_p_item,
+                    shred_output_item_code=shred_out_code,
+                    shred_output_name=shred_out_name,
                     is_active=True,
                     created_at=now,
                     updated_at=now,
                 )
             )
+        db.flush()
+
     db.commit()
 
     print(f"Imported/updated {len(plu_rows)} items")
@@ -135,12 +164,12 @@ def import_items(db: Session, item_code_path: str, client_data_path: str) -> Non
             print(f"  - {line}")
 
 
-def _parse_vendor_blocks(path: str) -> List[Tuple[str, List[Tuple[Optional[str], str, str, Decimal]]]]:
+def _parse_vendor_blocks(path: str) -> List[Tuple[str, List[Tuple[str, str, str, Decimal]]]]:
     wb = openpyxl.load_workbook(path, read_only=True, data_only=True)
     ws = wb["Rates 2026"]
-    vendors: List[Tuple[str, List[Tuple[Optional[str], str, str, Decimal]]]] = []
+    vendors: List[Tuple[str, List[Tuple[str, str, str, Decimal]]]] = []
     current_vendor: Optional[str] = None
-    current_items: List[Tuple[Optional[str], str, str, Decimal]] = []
+    current_items: List[Tuple[str, str, str, Decimal]] = []
 
     for row in ws.iter_rows(values_only=True):
         label = row[1]
@@ -228,15 +257,17 @@ def import_vendors(db: Session, client_data_path: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Import DigiScrapyard client master data")
+    default_item = os.path.join(ROOT, DEFAULT_ITEM_CODE_XLSX)
+    default_client = os.path.join(ROOT, DEFAULT_CLIENT_DATA_XLSX)
     parser.add_argument(
         "--item-code",
-        default=os.path.expanduser("~/Desktop/Item Code.xlsx"),
-        help="Path to Item Code.xlsx",
+        default=default_item,
+        help="Path to PLU item code xlsx",
     )
     parser.add_argument(
         "--client-data",
-        default=os.path.expanduser("~/Desktop/client_data.xlsx"),
-        help="Path to client_data.xlsx",
+        default=default_client,
+        help="Path to client 8-digit / vendor rates xlsx",
     )
     args = parser.parse_args()
 

@@ -12,6 +12,9 @@ class ItemMasterCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=500)
     uom: str = Field(..., min_length=1, max_length=10)
     is_shreddable: bool = False
+    is_p_item: bool = False
+    shred_output_item_code: Optional[str] = Field(None, max_length=20)
+    shred_output_name: Optional[str] = Field(None, max_length=500)
 
 
 class ItemMasterUpdate(BaseModel):
@@ -20,6 +23,9 @@ class ItemMasterUpdate(BaseModel):
     name: Optional[str] = Field(None, min_length=1, max_length=500)
     uom: Optional[str] = Field(None, min_length=1, max_length=10)
     is_shreddable: Optional[bool] = None
+    is_p_item: Optional[bool] = None
+    shred_output_item_code: Optional[str] = Field(None, max_length=20)
+    shred_output_name: Optional[str] = Field(None, max_length=500)
     is_active: Optional[bool] = None
 
 
@@ -30,6 +36,9 @@ class ItemMasterResponse(BaseModel):
     name: str
     uom: str
     is_shreddable: bool
+    is_p_item: bool
+    shred_output_item_code: Optional[str] = None
+    shred_output_name: Optional[str] = None
     is_active: bool
     created_at: int
     updated_at: int

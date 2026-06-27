@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Column, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import BigInteger, Boolean, Column, Enum, ForeignKey, Integer, Numeric, String
 
 from app.database.connection import Base
 from app.models.enums import DispatchMethod, MaterialState, TransferStatus
@@ -34,6 +34,7 @@ class Transfer(Base):
         nullable=False,
         default=MaterialState.NOT_SHREDDED,
     )
+    is_p_item = Column(Boolean, nullable=False, default=False)
     status = Column(
         Enum(TransferStatus, native_enum=False, length=20),
         nullable=False,

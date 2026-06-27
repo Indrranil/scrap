@@ -53,7 +53,16 @@ GROSS WT.: 7.350 Kg
 - **KG items** → QR dispatch only (`POST /v1/shopfloor/dispatch`)
 - **EA items** → manual dispatch only (`POST /v1/shopfloor/dispatch/manual`)
 
-**Shreddable items:** 8 KG PLU codes (`1499`, `P159`, `P106`, `PB06`, `PC06`, `P100`, `P177`, `P153`) require `material_state` (`shredded` or `not_shredded`) on QR dispatch. All other items default to `not_shredded`.
+**Shreddable items (P-items):** 7 KG PLU codes (`P159`, `P106`, `PB06`, `PC06`, `P100`, `P177`, `P153`) require `material_state` (`shredded` or `not_shredded`) on QR dispatch. All other items default to `not_shredded`.
+
+**P-items vs normal items:**
+- **Normal KG items** — transfer shows 8-digit SAP `item_code` and mapped name from `item_master`
+- **P-items** — transfer shows PLU code (e.g. `P159`) and P-list display name (e.g. `Cartons`); 8-digit code is **not** exposed on scan/dispatch/accept/reject
+- After shredding at scrapeyard, `POST /v1/scrapeyard/shred` records the 8-digit output in `shred_log`
+
+**Client-confirmed PLU → 8-digit overrides** (applied during import): `1402`, `1081`, `1430`, `1763`, `1313`, `1259` — see `app/constants/items.py`.
+
+**Import files:** `upated_itemcode.xlsx` (PLU list) and `updated_8digit.xlsx` (vendor rates). Run `python scripts/import_client_data.py` after deploy.
 
 ---
 
@@ -147,6 +156,7 @@ Authorization: Bearer <access_token>
 | `POST /v1/shopfloor/dispatch` | `employee_id` in JSON body |
 | `POST /v1/scrapeyard/accept` | `employee_id` in JSON body |
 | `POST /v1/scrapeyard/reject` | `employee_id` in JSON body |
+| `POST /v1/scrapeyard/shred` | `employee_id` in JSON body |
 | `POST /v1/shopfloor/rejected/{id}/acknowledge` | **`X-Employee-Id` header only** (no body) |
 
 ### Logout
@@ -171,6 +181,9 @@ Authorization: Bearer <access_token>
 | `POST /v1/shopfloor/rejected/{id}/acknowledge` | ✓ | | |
 | `POST /v1/scrapeyard/accept` | | ✓ | |
 | `POST /v1/scrapeyard/reject` | | ✓ | |
+| `POST /v1/scrapeyard/shred` | | ✓ | |
+| `GET /v1/scrapeyard/shred-log` | | ✓ | |
+| `GET /v1/scrapeyard/shred-log/{id}` | | ✓ | |
 | `GET /v1/plants` | | | ✓ |
 | `GET /v1/plants/{id}` | | | ✓ |
 | `POST /v1/plants` | | | ✓ |
@@ -359,6 +372,40 @@ Returns **403** if QR location plant does not match logged-in plant. Returns **4
 }
 ```
 
+### 4b. Shred log (Scrapeyard, P-items only)
+
+After accepting a P-item transfer, record shred completion:
+
+`POST /v1/scrapeyard/shred`
+```json
+{
+  "transfer_id": 1,
+  "quantity_kg": "12.000",
+  "employee_id": 13
+}
+```
+
+Validation: transfer must be `accepted`, `is_p_item=true`, and no existing shred log for that transfer. Output 8-digit code/name come from `item_master.shred_output_*`.
+
+**Response (201):**
+```json
+{
+  "id": 1,
+  "transfer_id": 1,
+  "scrapeyard_id": 1,
+  "input_plu_code": "P159",
+  "input_name": "Cartons",
+  "output_item_code": "1000091259",
+  "output_name": "CARTONS -JT",
+  "quantity_kg": "12.000",
+  "shredded_at": 1782396300
+}
+```
+
+`GET /v1/scrapeyard/shred-log` — list for logged-in scrapeyard. Query: `output_item_code`, `date_from`, `date_to` (unix seconds), `page`, `page_size`.
+
+`GET /v1/scrapeyard/shred-log/{id}` — single entry detail.
+
 ### 5. Acknowledge rejection (Shopfloor)
 
 `POST /v1/shopfloor/rejected/{transfer_id}/acknowledge`
@@ -388,6 +435,7 @@ No request body. Returns **400** if transfer is not in `rejected` status.
   "quantity_received": "7.350",
   "dispatch_method": "qr",
   "material_state": "not_shredded",
+  "is_p_item": false,
   "is_shreddable": false,
   "location": 3,
   "net_weight": "7.350",
@@ -437,6 +485,7 @@ When rejected, `rejection` contains `reason_type`, `qty_received`, `material_rec
   "quantity_received": "7.350",
   "dispatch_method": "qr",
   "material_state": "not_shredded",
+  "is_p_item": false,
   "is_shreddable": false,
   "status": "accepted",
   "dispatched_at": 1782396208,

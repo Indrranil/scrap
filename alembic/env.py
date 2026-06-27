@@ -14,6 +14,7 @@ from app.models import (  # noqa: F401
     RejectionDetail,
     ScrapSale,
     Scrapeyard,
+    ShredLog,
     Transfer,
     TransferEvent,
     Vendor,

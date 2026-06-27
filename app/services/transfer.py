@@ -68,9 +68,13 @@ class TransferService:
         payload.description = item.name
         payload.uom = item.uom.upper()
         payload.plu_code = item.plu_code
-        payload.item_code_8 = item.item_code
+        payload.is_p_item = item.is_p_item
         payload.is_shreddable = item.is_shreddable
         payload.requires_material_state = item.is_shreddable
+        if item.is_p_item:
+            payload.item_code_8 = None
+        else:
+            payload.item_code_8 = item.item_code
 
     def _transfer_is_shreddable(self, db: Session, transfer: Transfer) -> bool:
         if transfer.item_master_id:
@@ -150,6 +154,7 @@ class TransferService:
             gross_weight=transfer.gross_weight,
             dispatch_method=transfer.dispatch_method,
             material_state=transfer.material_state,
+            is_p_item=transfer.is_p_item,
             is_shreddable=self._transfer_is_shreddable(db, transfer),
             status=transfer.status,
             dispatched_at=transfer.dispatched_at,
@@ -238,6 +243,7 @@ class TransferService:
                 quantity_received=t.quantity_received,
                 dispatch_method=t.dispatch_method,
                 material_state=t.material_state,
+                is_p_item=t.is_p_item,
                 is_shreddable=self._transfer_is_shreddable(db, t),
                 status=t.status,
                 dispatched_at=t.dispatched_at,
@@ -291,7 +297,10 @@ class TransferService:
 
         scrapeyard = scrapeyard_service.get_active(db)
         now = int(time.time())
-        canonical_item_code = item.item_code or item.plu_code
+        if item.is_p_item:
+            stored_item_code = item.plu_code
+        else:
+            stored_item_code = item.item_code or item.plu_code
 
         if existing:
             transfer = existing
@@ -302,13 +311,14 @@ class TransferService:
             transfer.shopfloor_plant_id = qr_plant.id
             transfer.item_master_id = item.id
             transfer.plu_code = item.plu_code
-            transfer.item_code = canonical_item_code
+            transfer.item_code = stored_item_code
             transfer.item_name = item.name
             transfer.description = item.name
             transfer.uom = item.uom.upper()
             transfer.quantity_sent = payload.quantity
             transfer.material_state = material_state
             transfer.dispatch_method = DispatchMethod.QR
+            transfer.is_p_item = item.is_p_item
         else:
             transfer = Transfer(
                 qr_raw=data.qr_raw,
@@ -317,7 +327,7 @@ class TransferService:
                 scrapeyard_id=scrapeyard.id,
                 item_master_id=item.id,
                 plu_code=item.plu_code,
-                item_code=canonical_item_code,
+                item_code=stored_item_code,
                 item_name=item.name,
                 description=item.name,
                 uom=item.uom.upper(),
@@ -328,6 +338,7 @@ class TransferService:
                 gross_weight=payload.gross_weight,
                 dispatch_method=DispatchMethod.QR,
                 material_state=material_state,
+                is_p_item=item.is_p_item,
                 status=TransferStatus.DISPATCHED,
                 dispatched_by=employee.id,
                 dispatched_at=now,

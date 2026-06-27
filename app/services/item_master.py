@@ -87,10 +87,13 @@ class ItemMasterService:
         now = int(time.time())
         item = ItemMaster(
             plu_code=plu_code,
-            item_code=data.item_code,
+            item_code=None if data.is_p_item else data.item_code,
             name=data.name.strip(),
             uom=data.uom.upper(),
             is_shreddable=data.is_shreddable or plu_code in SHREDDABLE_PLU_CODES,
+            is_p_item=data.is_p_item,
+            shred_output_item_code=data.shred_output_item_code,
+            shred_output_name=data.shred_output_name,
             is_active=True,
             created_at=now,
             updated_at=now,
@@ -138,6 +141,12 @@ class ItemMasterService:
             item.uom = data.uom.upper()
         if data.is_shreddable is not None:
             item.is_shreddable = data.is_shreddable
+        if data.is_p_item is not None:
+            item.is_p_item = data.is_p_item
+        if data.shred_output_item_code is not None:
+            item.shred_output_item_code = data.shred_output_item_code or None
+        if data.shred_output_name is not None:
+            item.shred_output_name = data.shred_output_name or None
         if data.is_active is not None:
             item.is_active = data.is_active
         item.updated_at = int(time.time())

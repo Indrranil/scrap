@@ -44,10 +44,13 @@ Table employee_profile {
 Table item_master {
   id int [pk, increment]
   plu_code varchar(20) [not null, unique, note: '4-digit / alphanumeric code from QR']
-  item_code varchar(20) [unique, note: '8-digit SAP code']
+  item_code varchar(20) [unique, note: '8-digit SAP code; NULL for P-items']
   name varchar(500) [not null]
   uom varchar(10) [not null]
   is_shreddable boolean [not null, default: false]
+  is_p_item boolean [not null, default: false, note: 'Pre-shred identity; no item_code until shredded']
+  shred_output_item_code varchar(20) [note: '8-digit output after shred (P-items)']
+  shred_output_name varchar(500) [note: 'Canonical name after shred (P-items)']
   is_active boolean [not null]
   created_at bigint [not null]
   updated_at bigint [not null]
@@ -88,6 +91,7 @@ Table transfer {
   gross_weight decimal(12,3)
   dispatch_method varchar(10) [not null, note: 'qr|manual']
   material_state varchar(20) [not null, note: 'shredded|not_shredded']
+  is_p_item boolean [not null, default: false, note: 'P-list item; item_code is PLU until shred log']
   status varchar(20) [not null, note: 'pending|dispatched|accepted|rejected|acknowledged|sold']
   dispatched_by int [ref: > employee_profile.id]
   dispatched_at bigint
@@ -117,6 +121,19 @@ Table rejection_detail {
   qty_received decimal(12,3)
   material_received_name varchar(500)
   comment text
+}
+
+Table shred_log {
+  id int [pk, increment]
+  transfer_id int [not null, unique, ref: > transfer.id]
+  scrapeyard_id int [not null, ref: > scrapeyard.id]
+  input_plu_code varchar(20) [not null, note: 'P-item PLU at arrival']
+  input_name varchar(500) [not null, note: 'P-item display name at arrival']
+  output_item_code varchar(20) [not null, note: '8-digit code after shred']
+  output_name varchar(500) [not null]
+  quantity_kg decimal(12,3) [not null]
+  shredded_by int [not null, ref: > employee_profile.id]
+  shredded_at bigint [not null]
 }
 
 Table scrap_sale {
