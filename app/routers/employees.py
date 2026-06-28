@@ -14,7 +14,7 @@ router = APIRouter(prefix="/v1/employees", tags=["employees"])
 def list_employees(
     request: Request,
     db: Session = Depends(get_db),
-    _: bool = Depends(require_roles(["shopfloor", "scrapeyard"])),
+    _: bool = Depends(require_roles(["shopfloor", "scrapeyard", "gso"])),
 ):
     """List active employee profiles for the logged-in plant or scrapeyard."""
     user = get_current_user(request)
@@ -24,6 +24,8 @@ def list_employees(
         query = query.filter(EmployeeProfile.plant_id == user.get("plant_id"))
     elif user.get("role") == "scrapeyard":
         query = query.filter(EmployeeProfile.scrapeyard_id == user.get("scrapeyard_id"))
+    elif user.get("role") == "gso":
+        query = query.filter(EmployeeProfile.gso_id == user.get("gso_id"))
 
     employees = query.all()
     items = [EmployeeSummary(id=e.id, name=e.name) for e in employees]

@@ -2,11 +2,49 @@ import time
 
 from app.auth.jwt_auth import hash_password
 from app.models.employee_profile import EmployeeProfile
+from app.models.gso import Gso
 from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
 
 from app.auto_tests.conftest import SAMPLE_QR, SAMPLE_QR_UTE
 from app.auto_tests.item_fixtures import seed_ea_item, seed_p_item, seed_test_item
+
+
+def _create_gso(db):
+    gso = Gso(
+        name="General Shift Officer",
+        login_id="GSO",
+        password_hash=hash_password("1234"),
+        is_active=True,
+        created_at=int(time.time()),
+    )
+    db.add(gso)
+    db.flush()
+    emp = EmployeeProfile(
+        gso_id=gso.id,
+        name="GSO Employee",
+        is_active=True,
+        created_at=int(time.time()),
+    )
+    db.add(emp)
+    db.commit()
+    db.refresh(gso)
+    db.refresh(emp)
+    return gso, emp
+
+
+def _gso_approve(client, gso_emp, transfer_id):
+    gso_token = client.post(
+        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+    ).json()["access_token"]
+    response = client.post(
+        "/v1/gso/approve",
+        headers={"Authorization": f"Bearer {gso_token}"},
+        json={"transfer_id": transfer_id, "employee_id": gso_emp.id},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "dispatched"
+    return response
 
 
 def _create_scrapeyard(db):
@@ -60,6 +98,7 @@ def _create_plant(db, code, login_id, qr_location):
 def test_full_lifecycle_dispatch_accept(client, db_session):
     seed_test_item(db_session)
     sy, sy_emp = _create_scrapeyard(db_session)
+    _, gso_emp = _create_gso(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
 
     ude_token = client.post(
@@ -76,9 +115,11 @@ def test_full_lifecycle_dispatch_accept(client, db_session):
     )
     assert dispatch.status_code == 200
     transfer_id = dispatch.json()["id"]
-    assert dispatch.json()["status"] == "dispatched"
+    assert dispatch.json()["status"] == "pending_gso"
     assert dispatch.json()["item_code"] == "1000090313"
     assert dispatch.json()["plu_code"] == "1313"
+
+    _gso_approve(client, gso_emp, transfer_id)
 
     sy_token = client.post(
         "/v1/auth/login", json={"login_id": "SCRAP", "password": "1234"}
@@ -130,6 +171,7 @@ def test_reject_and_acknowledge(client, db_session):
         name="PAPER WASTE",
     )
     sy, sy_emp = _create_scrapeyard(db_session)
+    _, gso_emp = _create_gso(db_session)
     ute, ute_emp = _create_plant(db_session, "UTE", "UTE", 2)
 
     ute_token = client.post(
@@ -146,6 +188,8 @@ def test_reject_and_acknowledge(client, db_session):
     )
     assert dispatch.status_code == 200
     transfer_id = dispatch.json()["id"]
+
+    _gso_approve(client, gso_emp, transfer_id)
 
     sy_token = client.post(
         "/v1/auth/login", json={"login_id": "SCRAP", "password": "1234"}
@@ -303,6 +347,7 @@ GROSS WT.: 5.000 Kg"""
 def test_p_item_dispatch_hides_8digit_until_shred(client, db_session):
     seed_p_item(db_session)
     sy, sy_emp = _create_scrapeyard(db_session)
+    _, gso_emp = _create_gso(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
 
     p_qr = """HIDUSTAN UNILEVER LIMITED
@@ -343,6 +388,8 @@ GROSS WT.: 12.000 Kg"""
     assert body["item_name"] == "Cartons"
     assert body["is_p_item"] is True
     transfer_id = body["id"]
+
+    _gso_approve(client, gso_emp, transfer_id)
 
     sy_token = client.post(
         "/v1/auth/login", json={"login_id": "SCRAP", "password": "1234"}
@@ -412,3 +459,105 @@ def test_admin_plant_crud(client, db_session):
     )
     assert create.status_code == 201
     assert len(create.json()["employees"]) == 2
+
+
+def test_gso_reject_and_shopfloor_acknowledge(client, db_session):
+    seed_test_item(db_session)
+    _create_scrapeyard(db_session)
+    _, gso_emp = _create_gso(db_session)
+    ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+
+    ude_token = client.post(
+        "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
+    ).json()["access_token"]
+    gso_token = client.post(
+        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+    ).json()["access_token"]
+
+    dispatch = client.post(
+        "/v1/shopfloor/dispatch",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={"qr_raw": SAMPLE_QR, "employee_id": ude_emp.id},
+    )
+    assert dispatch.status_code == 200
+    transfer_id = dispatch.json()["id"]
+    assert dispatch.json()["status"] == "pending_gso"
+
+    reject = client.post(
+        "/v1/gso/reject",
+        headers={"Authorization": f"Bearer {gso_token}"},
+        json={
+            "transfer_id": transfer_id,
+            "employee_id": gso_emp.id,
+            "reason": "Quantity was short",
+        },
+    )
+    assert reject.status_code == 200
+    assert reject.json()["status"] == "gso_rejected"
+    assert reject.json()["gso_rejection_reason"] == "Quantity was short"
+
+    ack = client.post(
+        f"/v1/shopfloor/gso-rejected/{transfer_id}/acknowledge",
+        headers={
+            "Authorization": f"Bearer {ude_token}",
+            "X-Employee-Id": str(ude_emp.id),
+        },
+    )
+    assert ack.status_code == 200
+    assert ack.json()["status"] == "gso_acknowledged"
+
+
+def test_gso_auto_approve_after_two_hours(client, db_session):
+    from app.models.transfer import Transfer
+
+    seed_test_item(db_session)
+    _create_scrapeyard(db_session)
+    _create_gso(db_session)
+    ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+
+    ude_token = client.post(
+        "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
+    ).json()["access_token"]
+
+    dispatch = client.post(
+        "/v1/shopfloor/dispatch",
+        headers={"Authorization": f"Bearer {ude_token}"},
+        json={"qr_raw": SAMPLE_QR, "employee_id": ude_emp.id},
+    )
+    assert dispatch.status_code == 200
+    transfer_id = dispatch.json()["id"]
+
+    transfer = db_session.query(Transfer).filter(Transfer.id == transfer_id).first()
+    transfer.dispatched_at = int(time.time()) - 7201
+    db_session.commit()
+
+    gso_token = client.post(
+        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+    ).json()["access_token"]
+
+    pending = client.get(
+        "/v1/gso/pending",
+        headers={"Authorization": f"Bearer {gso_token}"},
+    )
+    assert pending.status_code == 200
+    assert pending.json()["total"] == 0
+
+    detail = client.get(
+        f"/v1/gso/{transfer_id}",
+        headers={"Authorization": f"Bearer {gso_token}"},
+    )
+    assert detail.status_code == 200
+    assert detail.json()["status"] == "dispatched"
+    assert detail.json()["gso_auto_approved"] is True
+
+
+def test_gso_login_returns_employees(client, db_session):
+    _create_gso(db_session)
+    response = client.post(
+        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["role"] == "gso"
+    assert body["gso_name"] == "General Shift Officer"
+    assert len(body["employees"]) == 1

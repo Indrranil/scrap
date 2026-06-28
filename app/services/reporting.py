@@ -40,10 +40,13 @@ class ReportingService:
         query = db.query(Transfer).filter(
             Transfer.status.in_(
                 [
+                    TransferStatus.PENDING_GSO,
                     TransferStatus.DISPATCHED,
                     TransferStatus.ACCEPTED,
                     TransferStatus.REJECTED,
                     TransferStatus.ACKNOWLEDGED,
+                    TransferStatus.GSO_REJECTED,
+                    TransferStatus.GSO_ACKNOWLEDGED,
                     TransferStatus.SOLD,
                 ]
             )
@@ -80,6 +83,11 @@ class ReportingService:
                 _add_to_totals(
                     rejected, t.uom, t.quantity_received or t.quantity_sent
                 )
+            if t.status in (
+                TransferStatus.GSO_REJECTED,
+                TransferStatus.GSO_ACKNOWLEDGED,
+            ):
+                _add_to_totals(rejected, t.uom, t.quantity_sent)
 
         gen_total = float(generated.kg + generated.ea)
         acc_pct = (float(accepted.kg + accepted.ea) / gen_total * 100) if gen_total else 0
@@ -141,6 +149,11 @@ class ReportingService:
                     _add_to_totals(acc, t.uom, t.quantity_received or t.quantity_sent)
                 if t.status in (TransferStatus.REJECTED, TransferStatus.ACKNOWLEDGED):
                     _add_to_totals(rej, t.uom, t.quantity_received or t.quantity_sent)
+                if t.status in (
+                    TransferStatus.GSO_REJECTED,
+                    TransferStatus.GSO_ACKNOWLEDGED,
+                ):
+                    _add_to_totals(rej, t.uom, t.quantity_sent)
             if gen.kg or gen.ea:
                 results.append(
                     PlantGenerationItem(

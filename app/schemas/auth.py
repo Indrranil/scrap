@@ -24,5 +24,7 @@ class LoginResponse(BaseModel):
     plant_name: Optional[str] = None
     scrapeyard_id: Optional[int] = None
     scrapeyard_name: Optional[str] = None
+    gso_id: Optional[int] = None
+    gso_name: Optional[str] = None
     admin_name: Optional[str] = None
     employees: List[EmployeeSummary] = []

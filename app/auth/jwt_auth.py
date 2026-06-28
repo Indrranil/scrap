@@ -29,6 +29,7 @@ def create_access_token(
     role: str,
     plant_id: Optional[int] = None,
     scrapeyard_id: Optional[int] = None,
+    gso_id: Optional[int] = None,
     expires_delta: Optional[timedelta] = None,
 ) -> str:
     expire = datetime.now(timezone.utc) + (
@@ -43,6 +44,8 @@ def create_access_token(
         payload["plant_id"] = plant_id
     if scrapeyard_id is not None:
         payload["scrapeyard_id"] = scrapeyard_id
+    if gso_id is not None:
+        payload["gso_id"] = gso_id
     return jwt.encode(payload, _get_jwt_secret(), algorithm=JWT_ALGORITHM)
 
 

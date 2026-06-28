@@ -1,4 +1,4 @@
-from sqlalchemy import BigInteger, Boolean, Column, Enum, ForeignKey, Integer, Numeric, String
+from sqlalchemy import BigInteger, Boolean, Column, Enum, ForeignKey, Integer, Numeric, String, Text
 
 from app.database.connection import Base
 from app.models.enums import DispatchMethod, MaterialState, TransferStatus
@@ -47,3 +47,9 @@ class Transfer(Base):
     processed_at = Column(BigInteger, nullable=True)
     acknowledged_by = Column(Integer, ForeignKey("employee_profile.id"), nullable=True)
     acknowledged_at = Column(BigInteger, nullable=True)
+    gso_approved_by = Column(Integer, ForeignKey("employee_profile.id"), nullable=True)
+    gso_approved_at = Column(BigInteger, nullable=True)
+    gso_auto_approved = Column(Boolean, nullable=False, default=False)
+    gso_rejected_by = Column(Integer, ForeignKey("employee_profile.id"), nullable=True)
+    gso_rejected_at = Column(BigInteger, nullable=True)
+    gso_rejection_reason = Column(Text, nullable=True)

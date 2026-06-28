@@ -6,7 +6,11 @@ from typing import List, Optional
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
-from app.auth.dependencies import validate_plant_employee, validate_scrapeyard_employee
+from app.auth.dependencies import (
+    validate_gso_employee,
+    validate_plant_employee,
+    validate_scrapeyard_employee,
+)
 from app.models.enums import (
     ActorRole,
     DispatchMethod,
@@ -22,6 +26,8 @@ from app.models.transfer_event import TransferEvent
 from app.schemas.transfer import (
     AcceptRequest,
     DispatchRequest,
+    GsoApproveRequest,
+    GsoRejectRequest,
     ManualDispatchRequest,
     QRScanResponse,
     RejectRequest,
@@ -31,13 +37,77 @@ from app.schemas.transfer import (
     TransferListItem,
     TransferResponse,
 )
+from app.services.gso_config import gso_approval_enabled, gso_auto_approve_seconds
 from app.services.item_master import item_master_service
 from app.services.plant_resolver import resolve_plant_by_qr_location
 from app.services.qr_parser import parse_qr_payload
 from app.services.scrapeyard import scrapeyard_service
 
 
+REDISPATCHABLE_STATUSES = {
+    TransferStatus.PENDING,
+    TransferStatus.GSO_REJECTED,
+    TransferStatus.GSO_ACKNOWLEDGED,
+    TransferStatus.ACKNOWLEDGED,
+}
+
+
 class TransferService:
+    def _post_dispatch_status(self) -> TransferStatus:
+        if gso_approval_enabled():
+            return TransferStatus.PENDING_GSO
+        return TransferStatus.DISPATCHED
+
+    def _auto_approve_transfer(self, db: Session, transfer: Transfer, now: int) -> bool:
+        transfer.status = TransferStatus.DISPATCHED
+        transfer.gso_approved_at = now
+        transfer.gso_auto_approved = True
+        db.add(
+            TransferEvent(
+                transfer_id=transfer.id,
+                event_type=TransferEventType.GSO_AUTO_APPROVED,
+                actor_role=ActorRole.GSO,
+                employee_profile_id=None,
+                employee_name="System",
+                quantity=transfer.quantity_sent,
+                created_at=now,
+            )
+        )
+        return True
+
+    def auto_approve_expired_gso(self, db: Session) -> int:
+        if not gso_approval_enabled():
+            return 0
+        now = int(time.time())
+        cutoff = now - gso_auto_approve_seconds()
+        expired = (
+            db.query(Transfer)
+            .filter(
+                Transfer.status == TransferStatus.PENDING_GSO,
+                Transfer.dispatched_at.isnot(None),
+                Transfer.dispatched_at <= cutoff,
+            )
+            .all()
+        )
+        count = 0
+        for transfer in expired:
+            self._auto_approve_transfer(db, transfer, now)
+            count += 1
+        if count:
+            db.commit()
+        return count
+
+    def _maybe_auto_approve_on_scan(self, db: Session, transfer: Transfer) -> None:
+        if transfer.status != TransferStatus.PENDING_GSO:
+            return
+        if not transfer.dispatched_at:
+            return
+        now = int(time.time())
+        if now - transfer.dispatched_at < gso_auto_approve_seconds():
+            return
+        self._auto_approve_transfer(db, transfer, now)
+        db.commit()
+        db.refresh(transfer)
     def _resolve_material_state(
         self,
         item: ItemMaster,
@@ -103,6 +173,8 @@ class TransferService:
         existing = (
             db.query(Transfer).filter(Transfer.qr_number == payload.qr_number).first()
         )
+        if existing:
+            self._maybe_auto_approve_on_scan(db, existing)
 
         resolved_plant = None
         plant_match = None
@@ -160,6 +232,10 @@ class TransferService:
             dispatched_at=transfer.dispatched_at,
             processed_at=transfer.processed_at,
             acknowledged_at=transfer.acknowledged_at,
+            gso_approved_at=transfer.gso_approved_at,
+            gso_auto_approved=transfer.gso_auto_approved,
+            gso_rejected_at=transfer.gso_rejected_at,
+            gso_rejection_reason=transfer.gso_rejection_reason,
             events=[
                 TransferEventResponse(
                     id=e.id,
@@ -196,6 +272,9 @@ class TransferService:
         date_from: Optional[int] = None,
         date_to: Optional[int] = None,
         rejected_only: bool = False,
+        gso_rejected_only: bool = False,
+        gso_pending_only: bool = False,
+        gso_history_status: Optional[str] = None,
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[int, List[TransferListItem]]:
@@ -219,6 +298,23 @@ class TransferService:
             query = query.filter(Transfer.material_state == material_state)
         if rejected_only:
             query = query.filter(Transfer.status == TransferStatus.REJECTED)
+        if gso_rejected_only:
+            query = query.filter(Transfer.status == TransferStatus.GSO_REJECTED)
+        if gso_pending_only:
+            query = query.filter(Transfer.status == TransferStatus.PENDING_GSO)
+        if gso_history_status == "approved":
+            query = query.filter(
+                Transfer.gso_approved_at.isnot(None),
+                Transfer.gso_auto_approved.is_(False),
+            )
+        elif gso_history_status == "auto_approved":
+            query = query.filter(Transfer.gso_auto_approved.is_(True))
+        elif gso_history_status == "rejected":
+            query = query.filter(
+                Transfer.status.in_(
+                    [TransferStatus.GSO_REJECTED, TransferStatus.GSO_ACKNOWLEDGED]
+                )
+            )
         if date_from:
             query = query.filter(Transfer.dispatched_at >= date_from)
         if date_to:
@@ -248,6 +344,9 @@ class TransferService:
                 status=t.status,
                 dispatched_at=t.dispatched_at,
                 processed_at=t.processed_at,
+                gso_approved_at=t.gso_approved_at,
+                gso_auto_approved=t.gso_auto_approved,
+                gso_rejected_at=t.gso_rejected_at,
             )
             for t in transfers
         ]
@@ -289,7 +388,7 @@ class TransferService:
         existing = (
             db.query(Transfer).filter(Transfer.qr_number == payload.qr_number).first()
         )
-        if existing and existing.status != TransferStatus.PENDING:
+        if existing and existing.status not in REDISPATCHABLE_STATUSES:
             raise HTTPException(
                 status_code=409,
                 detail=f"QR already used with status {existing.status.value}",
@@ -297,6 +396,7 @@ class TransferService:
 
         scrapeyard = scrapeyard_service.get_active(db)
         now = int(time.time())
+        post_dispatch_status = self._post_dispatch_status()
         if item.is_p_item:
             stored_item_code = item.plu_code
         else:
@@ -304,7 +404,18 @@ class TransferService:
 
         if existing:
             transfer = existing
-            transfer.status = TransferStatus.DISPATCHED
+            transfer.status = post_dispatch_status
+            transfer.gso_approved_by = None
+            transfer.gso_approved_at = None
+            transfer.gso_auto_approved = False
+            transfer.gso_rejected_by = None
+            transfer.gso_rejected_at = None
+            transfer.gso_rejection_reason = None
+            transfer.processed_by = None
+            transfer.processed_at = None
+            transfer.quantity_received = None
+            transfer.acknowledged_by = None
+            transfer.acknowledged_at = None
             transfer.dispatched_by = employee.id
             transfer.dispatched_at = now
             transfer.scrapeyard_id = scrapeyard.id
@@ -339,7 +450,7 @@ class TransferService:
                 dispatch_method=DispatchMethod.QR,
                 material_state=material_state,
                 is_p_item=item.is_p_item,
-                status=TransferStatus.DISPATCHED,
+                status=post_dispatch_status,
                 dispatched_by=employee.id,
                 dispatched_at=now,
             )
@@ -379,6 +490,7 @@ class TransferService:
         material_state = self._resolve_material_state(item, data.material_state)
         scrapeyard = scrapeyard_service.get_active(db)
         now = int(time.time())
+        post_dispatch_status = self._post_dispatch_status()
         canonical_item_code = item.item_code or item.plu_code
         qr_raw = (
             f"MANUAL DISPATCH\nPLU: {item.plu_code}\nNAME: {item.name}\n"
@@ -400,7 +512,7 @@ class TransferService:
             quantity_sent=data.quantity,
             dispatch_method=DispatchMethod.MANUAL,
             material_state=material_state,
-            status=TransferStatus.DISPATCHED,
+            status=post_dispatch_status,
             dispatched_by=employee.id,
             dispatched_at=now,
         )
@@ -411,6 +523,121 @@ class TransferService:
             TransferEvent(
                 transfer_id=transfer.id,
                 event_type=TransferEventType.DISPATCHED,
+                actor_role=ActorRole.SHOPFLOOR,
+                employee_profile_id=employee.id,
+                employee_name=employee.name,
+                quantity=transfer.quantity_sent,
+                created_at=now,
+            )
+        )
+        db.commit()
+        db.refresh(transfer)
+        return self._build_response(db, transfer)
+
+    def approve_gso(
+        self,
+        db: Session,
+        gso_id: int,
+        data: GsoApproveRequest,
+    ) -> TransferResponse:
+        self.auto_approve_expired_gso(db)
+        employee = validate_gso_employee(db, gso_id, data.employee_id)
+        transfer = db.query(Transfer).filter(Transfer.id == data.transfer_id).first()
+        if not transfer:
+            raise HTTPException(status_code=404, detail="Transfer not found")
+        if transfer.status != TransferStatus.PENDING_GSO:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot approve transfer in status {transfer.status.value}",
+            )
+
+        now = int(time.time())
+        transfer.status = TransferStatus.DISPATCHED
+        transfer.gso_approved_by = employee.id
+        transfer.gso_approved_at = now
+        transfer.gso_auto_approved = False
+
+        db.add(
+            TransferEvent(
+                transfer_id=transfer.id,
+                event_type=TransferEventType.GSO_APPROVED,
+                actor_role=ActorRole.GSO,
+                employee_profile_id=employee.id,
+                employee_name=employee.name,
+                quantity=transfer.quantity_sent,
+                created_at=now,
+            )
+        )
+        db.commit()
+        db.refresh(transfer)
+        return self._build_response(db, transfer)
+
+    def reject_gso(
+        self,
+        db: Session,
+        gso_id: int,
+        data: GsoRejectRequest,
+    ) -> TransferResponse:
+        employee = validate_gso_employee(db, gso_id, data.employee_id)
+        transfer = db.query(Transfer).filter(Transfer.id == data.transfer_id).first()
+        if not transfer:
+            raise HTTPException(status_code=404, detail="Transfer not found")
+        if transfer.status != TransferStatus.PENDING_GSO:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot reject transfer in status {transfer.status.value}",
+            )
+
+        now = int(time.time())
+        transfer.status = TransferStatus.GSO_REJECTED
+        transfer.gso_rejected_by = employee.id
+        transfer.gso_rejected_at = now
+        transfer.gso_rejection_reason = data.reason.strip()
+
+        db.add(
+            TransferEvent(
+                transfer_id=transfer.id,
+                event_type=TransferEventType.GSO_REJECTED,
+                actor_role=ActorRole.GSO,
+                employee_profile_id=employee.id,
+                employee_name=employee.name,
+                quantity=transfer.quantity_sent,
+                comment=transfer.gso_rejection_reason,
+                created_at=now,
+            )
+        )
+        db.commit()
+        db.refresh(transfer)
+        return self._build_response(db, transfer)
+
+    def acknowledge_gso_rejection(
+        self,
+        db: Session,
+        plant_id: int,
+        transfer_id: int,
+        employee_id: int,
+    ) -> TransferResponse:
+        employee = validate_plant_employee(db, plant_id, employee_id)
+        transfer = db.query(Transfer).filter(Transfer.id == transfer_id).first()
+        if not transfer:
+            raise HTTPException(status_code=404, detail="Transfer not found")
+        if transfer.shopfloor_plant_id != plant_id:
+            raise HTTPException(status_code=403, detail="Transfer not for this plant")
+        if transfer.status != TransferStatus.GSO_REJECTED:
+            raise HTTPException(
+                status_code=400,
+                detail="Only GSO-rejected transfers can be acknowledged",
+            )
+
+        now = int(time.time())
+        transfer.status = TransferStatus.GSO_ACKNOWLEDGED
+        transfer.acknowledged_by = employee.id
+        transfer.acknowledged_at = now
+
+        db.add(
+            TransferEvent(
+                transfer_id=transfer.id,
+                event_type=TransferEventType.GSO_ACKNOWLEDGED,
                 actor_role=ActorRole.SHOPFLOOR,
                 employee_profile_id=employee.id,
                 employee_name=employee.name,

@@ -9,6 +9,7 @@ from app.database.connection import Base
 from app.models import (  # noqa: F401
     AdminUser,
     EmployeeProfile,
+    Gso,
     ItemMaster,
     Plant,
     RejectionDetail,

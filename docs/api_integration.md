@@ -27,6 +27,7 @@ Health check: `GET /` (public) → `{ "status": "DigiScrapyard API is running" }
 ## Architecture overview
 
 - **3 shopfloor plants** (UDE, UTE, U535) — each has its own login and employees
+- **1 shared GSO** — single login (`GSO`) approves dispatches before scrapeyard intake
 - **1 shared scrapeyard** — single login (`SCRAP`) serves all plants
 - **Admin** — manages plants, scrapeyard config, reporting, and sales
 
@@ -172,6 +173,18 @@ GROSS WT.: 7.350 Kg
 }
 ```
 
+**Response (GSO):**
+```json
+{
+  "access_token": "<jwt>",
+  "token_type": "bearer",
+  "role": "gso",
+  "gso_id": 1,
+  "gso_name": "General Shift Officer",
+  "employees": [{ "id": 17, "name": "Employee 1" }]
+}
+```
+
 **Response (admin):**
 ```json
 {
@@ -182,7 +195,7 @@ GROSS WT.: 7.350 Kg
 }
 ```
 
-Store `access_token`, `role`, and role-specific IDs (`plant_id` / `scrapeyard_id`). Shopfloor and scrapeyard logins include `employees[]` for picker UI; you can also refresh via `GET /v1/employees`.
+Store `access_token`, `role`, and role-specific IDs (`plant_id` / `scrapeyard_id` / `gso_id`). Shopfloor, scrapeyard, and GSO logins include `employees[]` for picker UI; you can also refresh via `GET /v1/employees`.
 
 ### Authenticated requests
 
@@ -195,10 +208,13 @@ Authorization: Bearer <access_token>
 | Endpoint | How to pass employee |
 |----------|---------------------|
 | `POST /v1/shopfloor/dispatch` | `employee_id` in JSON body |
+| `POST /v1/gso/approve` | `employee_id` in JSON body |
+| `POST /v1/gso/reject` | `employee_id` in JSON body |
 | `POST /v1/scrapeyard/accept` | `employee_id` in JSON body |
 | `POST /v1/scrapeyard/reject` | `employee_id` in JSON body |
 | `POST /v1/scrapeyard/shred` | `employee_id` in JSON body |
 | `POST /v1/shopfloor/rejected/{id}/acknowledge` | **`X-Employee-Id` header only** (no body) |
+| `POST /v1/shopfloor/gso-rejected/{id}/acknowledge` | **`X-Employee-Id` header only** (no body) |
 
 ### Logout
 
@@ -208,25 +224,32 @@ Authorization: Bearer <access_token>
 
 ## Role → Endpoint Matrix
 
-| Endpoint | Shopfloor | Scrapeyard | Admin |
-|----------|-----------|------------|-------|
-| `GET /` | ✓ | ✓ | ✓ |
-| `POST /v1/auth/login` | ✓ | ✓ | ✓ |
-| `POST /v1/auth/logout` | ✓ | ✓ | ✓ |
-| `GET /v1/employees` | ✓ | ✓ | |
-| `POST /v1/transfers/scan` | ✓ | ✓ | |
-| `GET /v1/transfers/history` | ✓ | ✓ | ✓ |
-| `GET /v1/transfers/{id}` | ✓ | ✓ | ✓ |
-| `POST /v1/shopfloor/dispatch` | ✓ | | |
-| `GET /v1/shopfloor/items` | ✓ | | |
-| `POST /v1/shopfloor/dispatch/manual` | ✓ | | |
-| `GET /v1/shopfloor/rejected` | ✓ | | |
-| `POST /v1/shopfloor/rejected/{id}/acknowledge` | ✓ | | |
-| `POST /v1/scrapeyard/accept` | | ✓ | |
-| `POST /v1/scrapeyard/reject` | | ✓ | |
-| `POST /v1/scrapeyard/shred` | | ✓ | |
-| `GET /v1/scrapeyard/shred-log` | | ✓ | |
-| `GET /v1/scrapeyard/shred-log/{id}` | | ✓ | |
+| Endpoint | Shopfloor | GSO | Scrapeyard | Admin |
+|----------|-----------|-----|------------|-------|
+| `GET /` | ✓ | ✓ | ✓ | ✓ |
+| `POST /v1/auth/login` | ✓ | ✓ | ✓ | ✓ |
+| `POST /v1/auth/logout` | ✓ | ✓ | ✓ | ✓ |
+| `GET /v1/employees` | ✓ | ✓ | ✓ | |
+| `POST /v1/transfers/scan` | ✓ | | ✓ | |
+| `GET /v1/transfers/history` | ✓ | ✓ | ✓ | ✓ |
+| `GET /v1/transfers/{id}` | ✓ | ✓ | ✓ | ✓ |
+| `POST /v1/shopfloor/dispatch` | ✓ | | | |
+| `GET /v1/shopfloor/items` | ✓ | | | |
+| `POST /v1/shopfloor/dispatch/manual` | ✓ | | | |
+| `GET /v1/shopfloor/rejected` | ✓ | | | |
+| `POST /v1/shopfloor/rejected/{id}/acknowledge` | ✓ | | | |
+| `GET /v1/shopfloor/gso-rejected` | ✓ | | | |
+| `POST /v1/shopfloor/gso-rejected/{id}/acknowledge` | ✓ | | | |
+| `GET /v1/gso/pending` | | ✓ | | |
+| `GET /v1/gso/history` | | ✓ | | |
+| `GET /v1/gso/{id}` | | ✓ | | |
+| `POST /v1/gso/approve` | | ✓ | | |
+| `POST /v1/gso/reject` | | ✓ | | |
+| `POST /v1/scrapeyard/accept` | | | ✓ | |
+| `POST /v1/scrapeyard/reject` | | | ✓ | |
+| `POST /v1/scrapeyard/shred` | | | ✓ | |
+| `GET /v1/scrapeyard/shred-log` | | | ✓ | |
+| `GET /v1/scrapeyard/shred-log/{id}` | | | ✓ | |
 | `GET /v1/plants` | | | ✓ |
 | `GET /v1/plants/{id}` | | | ✓ |
 | `POST /v1/plants` | | | ✓ |
@@ -271,12 +294,24 @@ Returns active employees for the logged-in plant or scrapeyard.
 sequenceDiagram
     participant SF as Shopfloor App
     participant API as API
+    participant GSO as GSO App
     participant SY as Scrapeyard App
 
     SF->>API: POST /v1/transfers/scan
     API-->>SF: Material preview + plant_match
     SF->>API: POST /v1/shopfloor/dispatch
-    API-->>SF: status=dispatched
+    API-->>SF: status=pending_gso
+    alt GSO approves within 2h
+        GSO->>API: POST /v1/gso/approve
+        API-->>GSO: status=dispatched
+    else No GSO action for 2h
+        API-->>API: auto-approve to dispatched
+    else GSO rejects
+        GSO->>API: POST /v1/gso/reject
+        API-->>GSO: status=gso_rejected
+        SF->>API: POST /v1/shopfloor/gso-rejected/{id}/acknowledge
+        API-->>SF: status=gso_acknowledged
+    end
     SY->>API: POST /v1/transfers/scan
     API-->>SY: existing_transfer_id + existing_status
     alt Accept
@@ -294,7 +329,9 @@ sequenceDiagram
     end
 ```
 
-**Scrapeyard UX:** after scan, use `existing_transfer_id` and `existing_status` (`dispatched`) to drive accept/reject. Pass that `transfer_id` to accept/reject endpoints. For **P-items** (`is_p_item: true` on scan payload), after accept show a **Shred Save** action that calls `POST /v1/scrapeyard/shred`.
+**GSO UX:** `GET /v1/gso/pending` lists items awaiting approval. Approve via `POST /v1/gso/approve` or reject with a required `reason` via `POST /v1/gso/reject`. `GET /v1/gso/history` supports `status` filter: `approved`, `rejected`, or `auto_approved`.
+
+**Scrapeyard UX:** after scan, use `existing_transfer_id` and `existing_status`. If status is `pending_gso`, show awaiting GSO approval. When `dispatched`, drive accept/reject. Pass that `transfer_id` to accept/reject endpoints. For **P-items** (`is_p_item: true` on scan payload), after accept show a **Shred Save** action that calls `POST /v1/scrapeyard/shred`.
 
 ### 1. Scan QR
 
@@ -984,19 +1021,27 @@ Exception: `GET /v1/reporting/recent-transfers` uses `limit` instead of paginati
 ## Status Values
 
 ```
-pending → dispatched → accepted → sold
-                    ↘ rejected → acknowledged
-                    ↘ accepted (P-item) → shred log recorded (transfer stays accepted)
+pending → pending_gso → dispatched → accepted → sold
+                      ↘ gso_rejected → gso_acknowledged
+                      ↘ dispatched → rejected → acknowledged
+                      ↘ accepted (P-item) → shred log recorded (transfer stays accepted)
 ```
 
 | Status | Meaning |
 |--------|---------|
 | `pending` | QR reserved, not yet dispatched |
-| `dispatched` | Sent from shopfloor, awaiting scrapeyard |
+| `pending_gso` | Shopfloor dispatched; awaiting GSO approval (auto-approves after 2h) |
+| `dispatched` | GSO approved (or auto-approved); awaiting scrapeyard |
+| `gso_rejected` | GSO rejected with reason |
+| `gso_acknowledged` | Shopfloor acknowledged GSO rejection |
 | `accepted` | Scrapeyard accepted — for P-items, call `POST /v1/scrapeyard/shred` to record 8-digit output |
 | `rejected` | Scrapeyard rejected |
-| `acknowledged` | Shopfloor acknowledged rejection |
+| `acknowledged` | Shopfloor acknowledged scrapeyard rejection |
 | `sold` | Admin recorded sale |
+
+**GSO auto-approve:** configure `GSO_AUTO_APPROVE_HOURS` (default `2`). Run `scripts/auto_approve_gso.py` on a cron schedule in production, or rely on lazy auto-approve when GSO lists pending items or scrapeyard scans a QR.
+
+**Feature flag:** set `GSO_APPROVAL_ENABLED=false` to restore direct `dispatched` on shopfloor dispatch (legacy behavior).
 
 **P-item note:** shredding does **not** change transfer `status`. The shred is a separate `shred_log` record linked by `transfer_id`.
 
@@ -1011,3 +1056,4 @@ pending → dispatched → accepted → sold
 | UTE | UTE | 1234 | 2 |
 | U535 | U535 | 1234 | 4 |
 | Scrapeyard | SCRAP | 1234 | — |
+| GSO | GSO | 1234 | — |

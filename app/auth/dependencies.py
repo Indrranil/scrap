@@ -64,3 +64,22 @@ def validate_scrapeyard_employee(
             status_code=400, detail="Invalid employee for this scrapeyard"
         )
     return employee
+
+
+def validate_gso_employee(
+    db: Session,
+    gso_id: int,
+    employee_id: int,
+) -> EmployeeProfile:
+    employee = (
+        db.query(EmployeeProfile)
+        .filter(
+            EmployeeProfile.id == employee_id,
+            EmployeeProfile.gso_id == gso_id,
+            EmployeeProfile.is_active.is_(True),
+        )
+        .first()
+    )
+    if not employee:
+        raise HTTPException(status_code=400, detail="Invalid employee for this GSO")
+    return employee

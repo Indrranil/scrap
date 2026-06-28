@@ -1,5 +1,6 @@
 from app.models.admin_user import AdminUser
 from app.models.employee_profile import EmployeeProfile
+from app.models.gso import Gso
 from app.models.item_master import ItemMaster
 from app.models.plant import Plant
 from app.models.rejection_detail import RejectionDetail
@@ -14,6 +15,7 @@ from app.models.vendor_item import VendorItem
 __all__ = [
     "AdminUser",
     "EmployeeProfile",
+    "Gso",
     "ItemMaster",
     "Plant",
     "RejectionDetail",

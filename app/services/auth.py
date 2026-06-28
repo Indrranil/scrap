@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from app.auth.jwt_auth import create_access_token, hash_password, verify_password
 from app.models.admin_user import AdminUser
 from app.models.employee_profile import EmployeeProfile
+from app.models.gso import Gso
 from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
 from app.schemas.auth import EmployeeSummary, LoginRequest, LoginResponse
@@ -28,6 +29,29 @@ class AuthService:
                 access_token=token,
                 role="admin",
                 admin_name=admin.name,
+            )
+
+        gso = (
+            db.query(Gso)
+            .filter(
+                Gso.login_id == request.login_id,
+                Gso.is_active.is_(True),
+            )
+            .first()
+        )
+        if gso and verify_password(request.password, gso.password_hash):
+            employees = self._gso_employees(db, gso.id)
+            token = create_access_token(
+                subject=f"gso:{gso.id}",
+                role="gso",
+                gso_id=gso.id,
+            )
+            return LoginResponse(
+                access_token=token,
+                role="gso",
+                gso_id=gso.id,
+                gso_name=gso.name,
+                employees=employees,
             )
 
         scrapeyard = (
@@ -96,6 +120,17 @@ class AuthService:
             db.query(EmployeeProfile)
             .filter(
                 EmployeeProfile.scrapeyard_id == scrapeyard_id,
+                EmployeeProfile.is_active.is_(True),
+            )
+            .all()
+        )
+        return [EmployeeSummary(id=e.id, name=e.name) for e in rows]
+
+    def _gso_employees(self, db: Session, gso_id: int) -> List[EmployeeSummary]:
+        rows = (
+            db.query(EmployeeProfile)
+            .filter(
+                EmployeeProfile.gso_id == gso_id,
                 EmployeeProfile.is_active.is_(True),
             )
             .all()

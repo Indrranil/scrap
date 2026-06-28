@@ -79,6 +79,17 @@ class RejectRequest(BaseModel):
     comment: Optional[str] = None
 
 
+class GsoApproveRequest(BaseModel):
+    transfer_id: int
+    employee_id: int
+
+
+class GsoRejectRequest(BaseModel):
+    transfer_id: int
+    employee_id: int
+    reason: str = Field(..., min_length=1)
+
+
 class TransferEventResponse(BaseModel):
     id: int
     event_type: TransferEventType
@@ -124,6 +135,10 @@ class TransferResponse(BaseModel):
     dispatched_at: Optional[int] = None
     processed_at: Optional[int] = None
     acknowledged_at: Optional[int] = None
+    gso_approved_at: Optional[int] = None
+    gso_auto_approved: bool = False
+    gso_rejected_at: Optional[int] = None
+    gso_rejection_reason: Optional[str] = None
     events: List[TransferEventResponse] = []
     rejection: Optional[RejectionDetailResponse] = None
 
@@ -147,6 +162,9 @@ class TransferListItem(BaseModel):
     status: TransferStatus
     dispatched_at: Optional[int] = None
     processed_at: Optional[int] = None
+    gso_approved_at: Optional[int] = None
+    gso_auto_approved: bool = False
+    gso_rejected_at: Optional[int] = None
 
     class Config:
         from_attributes = True

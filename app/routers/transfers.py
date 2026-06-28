@@ -53,7 +53,7 @@ def transfer_history(
     plant_id: Optional[int] = None,
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
-    _: bool = Depends(require_roles(["shopfloor", "scrapeyard", "admin"])),
+    _: bool = Depends(require_roles(["shopfloor", "scrapeyard", "gso", "admin"])),
     db: Session = Depends(get_db),
 ):
     """List transfers with filters."""
@@ -92,7 +92,7 @@ def transfer_history(
 @router.get("/{transfer_id}", response_model=TransferResponse)
 def get_transfer(
     transfer_id: int,
-    _: bool = Depends(require_roles(["shopfloor", "scrapeyard", "admin"])),
+    _: bool = Depends(require_roles(["shopfloor", "scrapeyard", "gso", "admin"])),
     db: Session = Depends(get_db),
 ):
     """Get transfer detail with timeline."""

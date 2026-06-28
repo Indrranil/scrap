@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.auth.jwt_auth import hash_password
 from app.database.connection import SessionLocal
 from app.models.employee_profile import EmployeeProfile
+from app.models.gso import Gso
 from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
 from app.services.auth import auth_service
@@ -30,6 +31,13 @@ SCRAPEYARD = {
     "login_id": "SCRAP",
     "password": "1234",
     "employees": ["Employee 1", "Employee 2"],
+}
+
+GSO = {
+    "name": "General Shift Officer",
+    "login_id": "GSO",
+    "password": "1234",
+    "employees": ["Employee 1", "Employee 2", "Employee 3", "Employee 4"],
 }
 
 
@@ -87,6 +95,32 @@ def _seed_scrapeyard(db) -> None:
     print(f"  Scrapeyard {SCRAPEYARD['login_id']} created")
 
 
+def _seed_gso(db) -> None:
+    existing = db.query(Gso).filter(Gso.login_id == GSO["login_id"]).first()
+    if existing:
+        print(f"  GSO {GSO['login_id']} already exists — skipped")
+        return
+    gso = Gso(
+        name=GSO["name"],
+        login_id=GSO["login_id"],
+        password_hash=hash_password(GSO["password"]),
+        is_active=True,
+        created_at=int(time.time()),
+    )
+    db.add(gso)
+    db.flush()
+    for name in GSO["employees"]:
+        db.add(
+            EmployeeProfile(
+                gso_id=gso.id,
+                name=name,
+                is_active=True,
+                created_at=int(time.time()),
+            )
+        )
+    print(f"  GSO {GSO['login_id']} created")
+
+
 def main():
     db = SessionLocal()
     try:
@@ -108,6 +142,9 @@ def main():
 
         print("Seeding scrapeyard...")
         _seed_scrapeyard(db)
+
+        print("Seeding GSO...")
+        _seed_gso(db)
 
         db.commit()
         print("Seed complete.")

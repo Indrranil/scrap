@@ -3,10 +3,13 @@ import enum
 
 class TransferStatus(str, enum.Enum):
     PENDING = "pending"
+    PENDING_GSO = "pending_gso"
     DISPATCHED = "dispatched"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     ACKNOWLEDGED = "acknowledged"
+    GSO_REJECTED = "gso_rejected"
+    GSO_ACKNOWLEDGED = "gso_acknowledged"
     SOLD = "sold"
 
 
@@ -18,6 +21,10 @@ class RejectionReasonType(str, enum.Enum):
 
 class TransferEventType(str, enum.Enum):
     DISPATCHED = "dispatched"
+    GSO_APPROVED = "gso_approved"
+    GSO_AUTO_APPROVED = "gso_auto_approved"
+    GSO_REJECTED = "gso_rejected"
+    GSO_ACKNOWLEDGED = "gso_acknowledged"
     ACCEPTED = "accepted"
     REJECTED = "rejected"
     ACKNOWLEDGED = "acknowledged"
@@ -25,6 +32,7 @@ class TransferEventType(str, enum.Enum):
 
 class ActorRole(str, enum.Enum):
     SHOPFLOOR = "shopfloor"
+    GSO = "gso"
     SCRAPEYARD = "scrapeyard"
     ADMIN = "admin"
 
