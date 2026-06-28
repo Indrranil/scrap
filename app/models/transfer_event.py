@@ -9,8 +9,24 @@ class TransferEvent(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     transfer_id = Column(Integer, ForeignKey("transfer.id"), nullable=False, index=True)
-    event_type = Column(Enum(TransferEventType, native_enum=False, length=20), nullable=False)
-    actor_role = Column(Enum(ActorRole, native_enum=False, length=20), nullable=False)
+    event_type = Column(
+        Enum(
+            TransferEventType,
+            native_enum=False,
+            length=20,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
+        nullable=False,
+    )
+    actor_role = Column(
+        Enum(
+            ActorRole,
+            native_enum=False,
+            length=20,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
+        nullable=False,
+    )
     employee_profile_id = Column(Integer, ForeignKey("employee_profile.id"), nullable=True)
     employee_name = Column(String(255), nullable=False)
     quantity = Column(Numeric(12, 3), nullable=True)

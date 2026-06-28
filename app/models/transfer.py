@@ -25,18 +25,33 @@ class Transfer(Base):
     tare_weight = Column(Numeric(12, 3), nullable=True)
     gross_weight = Column(Numeric(12, 3), nullable=True)
     dispatch_method = Column(
-        Enum(DispatchMethod, native_enum=False, length=10),
+        Enum(
+            DispatchMethod,
+            native_enum=False,
+            length=10,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         nullable=False,
         default=DispatchMethod.QR,
     )
     material_state = Column(
-        Enum(MaterialState, native_enum=False, length=20),
+        Enum(
+            MaterialState,
+            native_enum=False,
+            length=20,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         nullable=False,
         default=MaterialState.NOT_SHREDDED,
     )
     is_p_item = Column(Boolean, nullable=False, default=False)
     status = Column(
-        Enum(TransferStatus, native_enum=False, length=20),
+        Enum(
+            TransferStatus,
+            native_enum=False,
+            length=20,
+            values_callable=lambda obj: [e.value for e in obj],
+        ),
         nullable=False,
         default=TransferStatus.PENDING,
         index=True,
