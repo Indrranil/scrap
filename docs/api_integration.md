@@ -101,7 +101,7 @@ GROSS WT.: 7.350 Kg
 | Transfer `item_name` | Mapped name | P-list display name |
 | After shred | N/A | Read `output_item_code` / `output_name` from shred log |
 
-**Client-confirmed PLU → 8-digit overrides** (applied during import): `1402`, `1081`, `1430`, `1763`, `1313`, `1259`, `1750`, `1253`, `1314`, `1021` — see `app/constants/items.py`. Multiple PLUs may share the same 8-digit SAP code (e.g. `1402` and `1253` → `1000091253`).
+**Client-confirmed PLU → 8-digit overrides** (applied during import): `1402` → `1000090402`, `1081`, `1430`, `1763`, `1313`, `1259`, `1750`, `1253`, `1314`, `1021` — see `app/constants/items.py`. Multiple PLUs may share the same 8-digit SAP code (e.g. `1750` and `1766` → `1000090766`).
 
 **Import files:** `upated_itemcode.xlsx` (PLU list) and `updated_8digit.xlsx` (vendor rates). Run `python scripts/import_client_data.py` after deploy.
 
@@ -699,7 +699,7 @@ GET /v1/transfers/history?page=1&page_size=50&status=accepted&date_from=2026-01-
 
 **Item response fields** (list + detail): `id`, `plu_code`, `item_code` (null for P-items), `name`, `uom`, `is_shreddable`, `is_p_item`, `shred_output_item_code`, `shred_output_name`, `is_active`, `created_at`, `updated_at`.
 
-> Multiple PLUs may share the same `item_code` (8-digit SAP code) — e.g. `1402` and `1253` both use `1000091253`.
+> Multiple PLUs may share the same `item_code` (8-digit SAP code) — e.g. `1750` and `1766` both use `1000090766`.
 
 `GET /v1/items/{id}` · `PATCH /v1/items/{id}` · `DELETE /v1/items/{id}` (soft delete)
 

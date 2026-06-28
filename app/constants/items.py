@@ -1,7 +1,7 @@
 """Item master constants for import and dispatch."""
 
 PLU_ITEM_CODE_OVERRIDES: dict[str, str] = {
-    "1402": "1000091253",
+    "1402": "1000090402",
     "1081": "1000524070",
     "1430": "1000524071",
     "1763": "1000090763",

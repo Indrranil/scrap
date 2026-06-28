@@ -55,9 +55,13 @@ def test_parse_rate_handles_invalid_values():
 def test_shared_item_code_allowed_across_plus():
     assigned: dict[str, str] = {}
     code_a, _, _ = _resolve_item_code("1402", "TUBE CUTTING SCRAP", {}, assigned)
-    code_b, _, _ = _resolve_item_code("1253", "TUBE CUTTING-JT", {}, assigned)
-    assert code_a == "1000091253"
-    assert code_b == "1000091253"
+    code_b, shred_code, shred_name = _resolve_item_code(
+        "P100", "Squeezed Tubes", {}, assigned
+    )
+    assert code_a == "1000090402"
+    assert code_b is None
+    assert shred_code == "1000090402"
+    assert shred_name == "Empty Tube Scrap"
 
 
 def test_excel_files_load_without_db_collision():
