@@ -5,7 +5,13 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import require_roles
 from app.database.connection import get_db
-from app.schemas.plant import PlantCreate, PlantListResponse, PlantResponse, PlantUpdate
+from app.schemas.plant import (
+    PlantCreate,
+    PlantCredentialsResponse,
+    PlantListResponse,
+    PlantResponse,
+    PlantUpdate,
+)
 from app.services.plant import plant_service
 
 router = APIRouter(prefix="/v1/plants", tags=["plants"])
@@ -40,6 +46,16 @@ def get_plant(
 ):
     """Get plant detail."""
     return plant_service.get_plant(db, plant_id)
+
+
+@router.get("/{plant_id}/credentials", response_model=PlantCredentialsResponse)
+def get_plant_credentials(
+    plant_id: int,
+    _: bool = Depends(require_roles(["admin"])),
+    db: Session = Depends(get_db),
+):
+    """Get shopfloor login credentials metadata for a plant."""
+    return plant_service.get_credentials(db, plant_id)
 
 
 @router.patch("/{plant_id}", response_model=PlantResponse)

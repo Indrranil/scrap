@@ -23,10 +23,11 @@ router = APIRouter(prefix="/v1/vendors", tags=["vendors"])
 @router.get("", response_model=VendorListResponse)
 def list_vendors(
     search: Optional[str] = None,
+    vendor_code: Optional[str] = None,
     _: bool = Depends(require_roles(["admin", "security"])),
     db: Session = Depends(get_db),
 ):
-    items = vendor_service.list_vendors(db, search=search)
+    items = vendor_service.list_vendors(db, search=search, vendor_code=vendor_code)
     return VendorListResponse(total=len(items), items=items)
 
 

@@ -8,11 +8,18 @@ from app.auth.jwt_auth import hash_password
 from app.models.employee_profile import EmployeeProfile
 from app.models.plant import Plant
 from app.schemas.auth import EmployeeSummary
-from app.schemas.plant import PlantCreate, PlantResponse, PlantUpdate
+from app.schemas.plant import PlantCreate, PlantCredentialsResponse, PlantResponse, PlantUpdate
+from app.services.gso_admin import gso_admin_service
 
 
 class PlantService:
-    def _to_response(self, db: Session, plant: Plant) -> PlantResponse:
+    def _to_response(
+        self,
+        db: Session,
+        plant: Plant,
+        *,
+        generated_password: Optional[str] = None,
+    ) -> PlantResponse:
         employees = (
             db.query(EmployeeProfile)
             .filter(
@@ -30,6 +37,7 @@ class PlantService:
             address=plant.address,
             is_active=plant.is_active,
             employees=[EmployeeSummary(id=e.id, name=e.name) for e in employees],
+            generated_password=generated_password,
         )
 
     def list_plants(
@@ -75,9 +83,10 @@ class PlantService:
         db.add(plant)
         db.flush()
         self._sync_employees(db, plant.id, data.employee_names)
+        gso_admin_service.ensure_gso_for_plant(db, plant, password=data.password)
         db.commit()
         db.refresh(plant)
-        return self._to_response(db, plant)
+        return self._to_response(db, plant, generated_password=data.password)
 
     def update_plant(
         self, db: Session, plant_id: int, data: PlantUpdate
@@ -112,7 +121,9 @@ class PlantService:
             plant.code = data.code
         if data.name is not None:
             plant.name = data.name
+        generated_password: Optional[str] = None
         if data.password:
+            generated_password = data.password
             plant.password_hash = hash_password(data.password)
         if data.address is not None:
             plant.address = data.address
@@ -122,7 +133,7 @@ class PlantService:
 
         db.commit()
         db.refresh(plant)
-        return self._to_response(db, plant)
+        return self._to_response(db, plant, generated_password=generated_password)
 
     def delete_plant(self, db: Session, plant_id: int) -> PlantResponse:
         plant = (
@@ -166,6 +177,16 @@ class PlantService:
                 employee_names=[e.name for e in employees],
             ),
         )
+
+    def get_credentials(self, db: Session, plant_id: int) -> PlantCredentialsResponse:
+        plant = (
+            db.query(Plant)
+            .filter(Plant.id == plant_id, Plant.is_active.is_(True))
+            .first()
+        )
+        if not plant:
+            raise HTTPException(status_code=404, detail="Plant not found")
+        return PlantCredentialsResponse(login_id=plant.login_id, has_password=True)
 
     def _sync_employees(
         self, db: Session, plant_id: int, names: List[str]

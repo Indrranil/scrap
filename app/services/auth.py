@@ -11,6 +11,7 @@ from app.models.gso import Gso
 from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
 from app.models.security import Security
+from app.schemas.admin import AdminProfileUpdate
 from app.schemas.auth import EmployeeSummary, LoginRequest, LoginResponse
 
 
@@ -199,6 +200,44 @@ class AuthService:
             created_at=int(time.time()),
         )
         db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        return admin
+
+    def _parse_admin_id(self, user: dict) -> int:
+        sub = user.get("id", "")
+        if not sub.startswith("admin:"):
+            raise HTTPException(status_code=403, detail="Not an admin user")
+        return int(sub.split(":", 1)[1])
+
+    def get_admin_profile(self, db: Session, user: dict) -> AdminUser:
+        admin_id = self._parse_admin_id(user)
+        admin = (
+            db.query(AdminUser)
+            .filter(AdminUser.id == admin_id, AdminUser.is_active.is_(True))
+            .first()
+        )
+        if not admin:
+            raise HTTPException(status_code=404, detail="Admin not found")
+        return admin
+
+    def update_admin_profile(
+        self, db: Session, user: dict, data: AdminProfileUpdate
+    ) -> AdminUser:
+        admin = self.get_admin_profile(db, user)
+
+        if data.name is not None:
+            admin.name = data.name.strip()
+
+        if data.new_password:
+            if not data.old_password:
+                raise HTTPException(
+                    status_code=400, detail="Old password is required to set a new password"
+                )
+            if not verify_password(data.old_password, admin.password_hash):
+                raise HTTPException(status_code=400, detail="Old password is incorrect")
+            admin.password_hash = hash_password(data.new_password)
+
         db.commit()
         db.refresh(admin)
         return admin

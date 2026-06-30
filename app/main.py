@@ -6,7 +6,11 @@ from starlette import status
 from app.auth.auth import AuthMiddleware
 from app.routers.auth import router as auth_router
 from app.routers.employees import router as employees_router
+from app.routers.admin_profile import router as admin_profile_router
 from app.routers.gso import router as gso_router
+from app.routers.gso_admin import router as gso_admin_router
+from app.routers.material_sales_admin import router as material_sales_admin_router
+from app.routers.security_admin import router as security_admin_router
 from app.routers.images import router as images_router
 from app.routers.items import router as items_router
 from app.routers.plants import router as plants_router
@@ -42,6 +46,10 @@ app.include_router(shopfloor_router)
 app.include_router(scrapeyard_router)
 app.include_router(security_router)
 app.include_router(gso_router)
+app.include_router(gso_admin_router)
+app.include_router(security_admin_router)
+app.include_router(admin_profile_router)
+app.include_router(material_sales_admin_router)
 app.include_router(scrapeyard_admin_router)
 app.include_router(plants_router)
 app.include_router(items_router)

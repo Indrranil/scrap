@@ -74,11 +74,16 @@ class VendorService:
             raise HTTPException(status_code=409, detail="Vendor code already exists")
 
     def list_vendors(
-        self, db: Session, search: Optional[str] = None
+        self,
+        db: Session,
+        search: Optional[str] = None,
+        vendor_code: Optional[str] = None,
     ) -> List[VendorResponse]:
         query = db.query(Vendor).filter(Vendor.is_active.is_(True))
         if search:
             query = query.filter(Vendor.name.ilike(f"%{search}%"))
+        if vendor_code:
+            query = query.filter(Vendor.vendor_code.ilike(f"%{vendor_code}%"))
         vendors = query.order_by(Vendor.name.asc()).all()
         return [self._to_vendor_response(v) for v in vendors]
 
@@ -109,6 +114,24 @@ class VendorService:
         vendor = Vendor(name=name, is_active=True)
         self._apply_vendor_fields(vendor, data, is_create=True)
         db.add(vendor)
+        db.flush()
+        for assignment in data.items:
+            item = (
+                db.query(ItemMaster)
+                .filter(ItemMaster.id == assignment.item_id, ItemMaster.is_active.is_(True))
+                .first()
+            )
+            if not item:
+                raise HTTPException(
+                    status_code=404, detail=f"Item {assignment.item_id} not found"
+                )
+            db.add(
+                VendorItem(
+                    vendor_id=vendor.id,
+                    item_id=assignment.item_id,
+                    rate_inr=assignment.rate_inr,
+                )
+            )
         db.commit()
         db.refresh(vendor)
         return self._to_vendor_response(vendor)

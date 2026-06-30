@@ -4,6 +4,11 @@ from typing import List, Optional
 from pydantic import BaseModel, EmailStr, Field
 
 
+class VendorItemAssignment(BaseModel):
+    item_id: int
+    rate_inr: Decimal = Field(..., ge=0)
+
+
 class VendorCreate(BaseModel):
     name: str = Field(..., min_length=1, max_length=255)
     vendor_code: Optional[str] = Field(None, max_length=50)
@@ -12,6 +17,7 @@ class VendorCreate(BaseModel):
     phone: Optional[str] = Field(None, max_length=50)
     address: Optional[str] = Field(None, max_length=500)
     gst_number: Optional[str] = Field(None, max_length=50)
+    items: List[VendorItemAssignment] = Field(default_factory=list)
 
 
 class VendorUpdate(BaseModel):

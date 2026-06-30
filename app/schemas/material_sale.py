@@ -70,3 +70,7 @@ class MaterialSaleListItem(BaseModel):
 class MaterialSaleListResponse(BaseModel):
     total: int
     items: List[MaterialSaleListItem]
+
+
+class MaterialSaleReject(BaseModel):
+    reason: str = Field(..., min_length=1)

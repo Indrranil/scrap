@@ -34,9 +34,15 @@ class PlantResponse(BaseModel):
     address: Optional[str] = None
     is_active: bool
     employees: List[EmployeeSummary] = []
+    generated_password: Optional[str] = None
 
     class Config:
         from_attributes = True
+
+
+class PlantCredentialsResponse(BaseModel):
+    login_id: str
+    has_password: bool = True
 
 
 class PlantListResponse(BaseModel):

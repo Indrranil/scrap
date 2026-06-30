@@ -20,6 +20,7 @@ class MaterialSale(Base):
     recorded_by = Column(Integer, ForeignKey("employee_profile.id"), nullable=False)
     recorded_at = Column(BigInteger, nullable=False, index=True)
     reviewed_by = Column(Integer, ForeignKey("employee_profile.id"), nullable=True)
+    reviewed_by_admin_id = Column(Integer, ForeignKey("admin_user.id"), nullable=True)
     reviewed_at = Column(BigInteger, nullable=True)
     rejection_comment = Column(Text, nullable=True)
     transfer_id = Column(Integer, ForeignKey("transfer.id"), nullable=True)

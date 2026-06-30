@@ -433,6 +433,44 @@ class MaterialSaleService:
             )
         return total, items
 
+    def approve_sale(
+        self, db: Session, sale_id: int, admin_id: int
+    ) -> MaterialSaleResponse:
+        sale = db.query(MaterialSale).filter(MaterialSale.id == sale_id).first()
+        if not sale:
+            raise HTTPException(status_code=404, detail="Sale not found")
+        if sale.status != MaterialSaleStatus.PENDING.value:
+            raise HTTPException(
+                status_code=400, detail="Only pending sales can be approved"
+            )
+        now = int(time.time())
+        sale.status = MaterialSaleStatus.APPROVED.value
+        sale.reviewed_at = now
+        sale.reviewed_by_admin_id = admin_id
+        db.commit()
+        db.refresh(sale)
+        return self.get_sale(db, sale_id)
+
+    def reject_sale(
+        self, db: Session, sale_id: int, admin_id: int, reason: str
+    ) -> MaterialSaleResponse:
+        sale = db.query(MaterialSale).filter(MaterialSale.id == sale_id).first()
+        if not sale:
+            raise HTTPException(status_code=404, detail="Sale not found")
+        if sale.status != MaterialSaleStatus.PENDING.value:
+            raise HTTPException(
+                status_code=400, detail="Only pending sales can be rejected"
+            )
+        now = int(time.time())
+        sale.status = MaterialSaleStatus.REJECTED.value
+        sale.rejection_comment = reason.strip()
+        sale.reviewed_at = now
+        sale.reviewed_by_admin_id = admin_id
+        self.release_sale_stock(db, sale_id)
+        db.commit()
+        db.refresh(sale)
+        return self.get_sale(db, sale_id)
+
     def release_sale_stock(self, db: Session, sale_id: int) -> None:
         """Restore inventory when admin rejects a sale (admin phase hook)."""
         sale = db.query(MaterialSale).filter(MaterialSale.id == sale_id).first()
