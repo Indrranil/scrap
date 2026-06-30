@@ -39,10 +39,10 @@ Health check: `GET /` (public) → `{ "status": "DigiScrapyard API is running" }
 | **Shred workflow** | New scrapeyard endpoints: `POST /v1/scrapeyard/shred`, `GET /v1/scrapeyard/shred-log`, `GET /v1/scrapeyard/shred-log/{id}` |
 | **Display rules** | Normal items: `item_code` = 8-digit SAP code. P-items: `item_code` = PLU (e.g. `P159`), `item_name` = display name (e.g. `Cartons`) |
 | **8-digit after shred** | Only appears in **shred log** (`output_item_code`, `output_name`) — not on the transfer itself |
-| **Material state** | Required on QR dispatch when `is_shreddable: true` (all P-items). `1499 GARBAGE` is **not** shreddable |
+| **Material state** | **Server-derived** on dispatch — P-items → `not_shredded`, non-P → `shredded`. Do not send from client |
 | **Admin items** | Item master responses include `is_p_item`, `shred_output_item_code`, `shred_output_name` |
 
-**GSO app UI flow:** login → employee picker → **Dispatch Approval** (`GET /v1/gso/pending`) → detail → approve / reject with reason → **History** (`GET /v1/gso/history`).
+**GSO app UI flow:** login (`GSO-UDE` / `GSO-UTE` / `GSO-U535`) → employee picker → **Dispatch Approval** (`GET /v1/gso/pending`, plant-scoped) → detail → approve / reject with reason → **History** (`GET /v1/gso/history`).
 
 **Shopfloor after dispatch:** show `pending_gso` until GSO acts; if GSO rejects, list via `GET /v1/shopfloor/gso-rejected` and acknowledge.
 
@@ -142,7 +142,7 @@ GROSS WT.: 7.350 Kg
 | Type | Format |
 |------|--------|
 | Decimals | JSON **strings** (e.g. `"7.350"`, `"84000.00"`) — parse in TypeScript as needed |
-| Timestamps | Unix **seconds** (`dispatched_at`, `processed_at`, `acknowledged_at`, `gso_approved_at`, `gso_rejected_at`, `sold_at`, `sent_on`) |
+| Timestamps | Unix **seconds** (`dispatched_at`, `processed_at`, `acknowledged_at`, `gso_approved_at`, `gso_rejected_at`, `sold_at`, `sent_on`, `recorded_at`, `shredded_at`) |
 | JWT expiry | Default **24 hours** (`JWT_EXPIRE_HOURS`); on **401**, redirect to login |
 | CORS | Enabled for all origins |
 
@@ -226,15 +226,29 @@ GROSS WT.: 7.350 Kg
 }
 ```
 
-**Response (GSO):**
+**Response (GSO — per plant):**
 ```json
 {
   "access_token": "<jwt>",
   "token_type": "bearer",
   "role": "gso",
   "gso_id": 1,
-  "gso_name": "General Shift Officer",
+  "gso_name": "GSO Unit 3",
+  "plant_id": 1,
+  "plant_name": "UDE",
   "employees": [{ "id": 17, "name": "Employee 1" }]
+}
+```
+
+**Response (security):**
+```json
+{
+  "access_token": "<jwt>",
+  "token_type": "bearer",
+  "role": "security",
+  "security_id": 1,
+  "security_name": "Security Gate",
+  "employees": [{ "id": 20, "name": "Security Employee" }]
 }
 ```
 
@@ -248,7 +262,7 @@ GROSS WT.: 7.350 Kg
 }
 ```
 
-Store `access_token`, `role`, and role-specific IDs (`plant_id` / `scrapeyard_id` / `gso_id`). Shopfloor, scrapeyard, and GSO logins include `employees[]` for picker UI; you can also refresh via `GET /v1/employees`.
+Store `access_token`, `role`, and role-specific IDs (`plant_id` / `scrapeyard_id` / `gso_id` / `security_id`). Shopfloor, scrapeyard, GSO, and security logins include `employees[]` for picker UI; you can also refresh via `GET /v1/employees`.
 
 ### Authenticated requests
 
@@ -266,6 +280,7 @@ Authorization: Bearer <access_token>
 | `POST /v1/scrapeyard/accept` | `employee_id` in JSON body |
 | `POST /v1/scrapeyard/reject` | `employee_id` in JSON body |
 | `POST /v1/scrapeyard/shred` | `employee_id` in JSON body |
+| `POST /v1/security/sales` | `employee_id` in JSON body |
 | `POST /v1/shopfloor/rejected/{id}/acknowledge` | **`X-Employee-Id` header only** (no body) |
 | `POST /v1/shopfloor/gso-rejected/{id}/acknowledge` | **`X-Employee-Id` header only** (no body) |
 
@@ -277,74 +292,86 @@ Authorization: Bearer <access_token>
 
 ## Role → Endpoint Matrix
 
-| Endpoint | Shopfloor | GSO | Scrapeyard | Admin |
-|----------|-----------|-----|------------|-------|
-| `GET /` | ✓ | ✓ | ✓ | ✓ |
-| `POST /v1/auth/login` | ✓ | ✓ | ✓ | ✓ |
-| `POST /v1/auth/logout` | ✓ | ✓ | ✓ | ✓ |
-| `GET /v1/employees` | ✓ | ✓ | ✓ | |
-| `POST /v1/transfers/scan` | ✓ | | ✓ | |
-| `GET /v1/transfers/history` | ✓ | ✓ | ✓ | ✓ |
-| `GET /v1/transfers/{id}` | ✓ | ✓ | ✓ | ✓ |
-| `POST /v1/shopfloor/dispatch` | ✓ | | | |
-| `GET /v1/shopfloor/items` | ✓ | | | |
-| `POST /v1/shopfloor/dispatch/manual` | ✓ | | | |
-| `GET /v1/shopfloor/rejected` | ✓ | | | |
-| `POST /v1/shopfloor/rejected/{id}/acknowledge` | ✓ | | | |
-| `GET /v1/shopfloor/gso-rejected` | ✓ | | | |
-| `POST /v1/shopfloor/gso-rejected/{id}/acknowledge` | ✓ | | | |
-| `GET /v1/gso/pending` | | ✓ | | |
-| `GET /v1/gso/history` | | ✓ | | |
-| `GET /v1/gso/{id}` | | ✓ | | |
-| `POST /v1/gso/approve` | | ✓ | | |
-| `POST /v1/gso/reject` | | ✓ | | |
-| `POST /v1/scrapeyard/accept` | | | ✓ | |
-| `POST /v1/scrapeyard/reject` | | | ✓ | |
-| `POST /v1/scrapeyard/shred` | | | ✓ | |
-| `GET /v1/scrapeyard/shred-log` | | | ✓ | |
-| `GET /v1/scrapeyard/shred-log/{id}` | | | ✓ | |
-| `GET /v1/plants` | | | | ✓ |
-| `GET /v1/plants/{id}` | | | | ✓ |
-| `POST /v1/plants` | | | | ✓ |
-| `PATCH /v1/plants/{id}` | | | | ✓ |
-| `DELETE /v1/plants/{id}` | | | | ✓ |
-| `POST /v1/plants/{id}/copy` | | | | ✓ |
-| `GET /v1/plants/{id}/credentials` | | | | ✓ |
-| `GET /v1/plants/{id}/gso` | | | | ✓ |
-| `PATCH /v1/plants/{id}/gso` | | | | ✓ |
-| `GET /v1/scrapeyard-config` | | | | ✓ |
-| `PATCH /v1/scrapeyard-config` | | | | ✓ |
-| `GET /v1/security-config` | | | | ✓ |
-| `PATCH /v1/security-config` | | | | ✓ |
-| `GET /v1/admin/profile` | | | | ✓ |
-| `PATCH /v1/admin/profile` | | | | ✓ |
-| `GET /v1/material-sales` | | | | ✓ |
-| `GET /v1/material-sales/{id}` | | | | ✓ |
-| `POST /v1/material-sales/{id}/approve` | | | | ✓ |
-| `POST /v1/material-sales/{id}/reject` | | | | ✓ |
-| `GET /v1/reporting/*` | | | | ✓ |
-| `GET /v1/items` | | | | ✓ |
-| `POST /v1/items` | | | | ✓ |
-| `GET /v1/items/post-shred-options` | | | | ✓ |
-| `POST /v1/items/with-vendors` | | | | ✓ |
-| `PATCH /v1/items/{id}` | | | | ✓ |
-| `DELETE /v1/items/{id}` | | | | ✓ |
-| `GET /v1/vendors` | | | | ✓ |
-| `POST /v1/vendors` | | | | ✓ |
-| `PATCH /v1/vendors/{id}` | | | | ✓ |
-| `DELETE /v1/vendors/{id}` | | | | ✓ |
-| `GET /v1/sales` | | | | ✓ |
-| `POST /v1/sales` | | | | ✓ |
+| Endpoint | Shopfloor | GSO | Scrapeyard | Security | Admin |
+|----------|-----------|-----|------------|----------|-------|
+| `GET /` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `POST /v1/auth/login` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `POST /v1/auth/logout` | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `GET /v1/employees` | ✓ | ✓ | ✓ | ✓ | |
+| `POST /v1/transfers/scan` | ✓ | | ✓ | | |
+| `GET /v1/transfers/history` | ✓ | ✓ | ✓ | | ✓ |
+| `GET /v1/transfers/{id}` | ✓ | ✓ | ✓ | | ✓ |
+| `POST /v1/shopfloor/dispatch` | ✓ | | | | |
+| `GET /v1/shopfloor/items` | ✓ | | | | |
+| `POST /v1/shopfloor/dispatch/manual` | ✓ | | | | |
+| `GET /v1/shopfloor/rejected` | ✓ | | | | |
+| `POST /v1/shopfloor/rejected/{id}/acknowledge` | ✓ | | | | |
+| `GET /v1/shopfloor/gso-rejected` | ✓ | | | | |
+| `POST /v1/shopfloor/gso-rejected/{id}/acknowledge` | ✓ | | | | |
+| `GET /v1/gso/pending` | | ✓ | | | |
+| `GET /v1/gso/history` | | ✓ | | | |
+| `GET /v1/gso/{id}` | | ✓ | | | |
+| `POST /v1/gso/approve` | | ✓ | | | |
+| `POST /v1/gso/reject` | | ✓ | | | |
+| `POST /v1/scrapeyard/accept` | | | ✓ | | |
+| `POST /v1/scrapeyard/reject` | | | ✓ | | |
+| `GET /v1/scrapeyard/ready-for-sale` | | | ✓ | | |
+| `GET /v1/scrapeyard/shred-queue` | | | ✓ | | |
+| `POST /v1/scrapeyard/shred` | | | ✓ | | |
+| `GET /v1/scrapeyard/shred-log` | | | ✓ | | |
+| `GET /v1/scrapeyard/shred-log/{id}` | | | ✓ | | |
+| `GET /v1/security/available-materials` | | | | ✓ | |
+| `POST /v1/security/sales` | | | | ✓ | |
+| `GET /v1/security/sales/history` | | | | ✓ | |
+| `GET /v1/security/sales/{id}` | | | | ✓ | |
+| `GET /v1/vendors` | | | | ✓ | ✓ |
+| `GET /v1/plants` | | | | | ✓ |
+| `GET /v1/plants/{id}` | | | | | ✓ |
+| `POST /v1/plants` | | | | | ✓ |
+| `PATCH /v1/plants/{id}` | | | | | ✓ |
+| `DELETE /v1/plants/{id}` | | | | | ✓ |
+| `POST /v1/plants/{id}/copy` | | | | | ✓ |
+| `GET /v1/plants/{id}/credentials` | | | | | ✓ |
+| `GET /v1/plants/{id}/gso` | | | | | ✓ |
+| `PATCH /v1/plants/{id}/gso` | | | | | ✓ |
+| `GET /v1/scrapeyard-config` | | | | | ✓ |
+| `PATCH /v1/scrapeyard-config` | | | | | ✓ |
+| `GET /v1/security-config` | | | | | ✓ |
+| `PATCH /v1/security-config` | | | | | ✓ |
+| `GET /v1/admin/profile` | | | | | ✓ |
+| `PATCH /v1/admin/profile` | | | | | ✓ |
+| `GET /v1/material-sales` | | | | | ✓ |
+| `GET /v1/material-sales/{id}` | | | | | ✓ |
+| `POST /v1/material-sales/{id}/approve` | | | | | ✓ |
+| `POST /v1/material-sales/{id}/reject` | | | | | ✓ |
+| `GET /v1/reporting/*` | | | | | ✓ |
+| `GET /v1/items` | | | | | ✓ |
+| `POST /v1/items` | | | | | ✓ |
+| `GET /v1/items/{id}` | | | | | ✓ |
+| `GET /v1/items/post-shred-options` | | | | | ✓ |
+| `POST /v1/items/with-vendors` | | | | | ✓ |
+| `PATCH /v1/items/{id}` | | | | | ✓ |
+| `DELETE /v1/items/{id}` | | | | | ✓ |
+| `POST /v1/vendors` | | | | | ✓ |
+| `GET /v1/vendors/{id}` | | | | | ✓ |
+| `PATCH /v1/vendors/{id}` | | | | | ✓ |
+| `DELETE /v1/vendors/{id}` | | | | | ✓ |
+| `GET /v1/vendors/{id}/items` | | | | | ✓ |
+| `POST /v1/vendors/{id}/items` | | | | | ✓ |
+| `PATCH /v1/vendors/{id}/items/{vendor_item_id}` | | | | | ✓ |
+| `DELETE /v1/vendors/{id}/items/{vendor_item_id}` | | | | | ✓ |
+| `GET /v1/sales` | | | | | ✓ |
+| `POST /v1/sales` | | | | | ✓ |
 
-> **Note:** Admin cannot call `POST /v1/transfers/scan` (returns **403**).
+> **Note:** Admin cannot call `POST /v1/transfers/scan` (returns **403**). Security can list vendors (`GET /v1/vendors`) but cannot create or modify them.
 
 ---
 
 ## Employees
 
-`GET /v1/employees` — shopfloor, scrapeyard, or GSO.
+`GET /v1/employees` — shopfloor, scrapeyard, GSO, or security.
 
-Returns active employees for the logged-in plant, scrapeyard, or GSO account.
+Returns active employees for the logged-in plant, scrapeyard, GSO, or security account.
 
 **Response:**
 ```json
@@ -400,7 +427,7 @@ sequenceDiagram
     end
 ```
 
-**GSO UX:** `GET /v1/gso/pending` lists items awaiting approval. Approve via `POST /v1/gso/approve` or reject with a required `reason` via `POST /v1/gso/reject`. `GET /v1/gso/history` supports `status` filter: `approved`, `rejected`, or `auto_approved`.
+**GSO UX:** `GET /v1/gso/pending` lists items awaiting approval for the **logged-in plant**. Approve via `POST /v1/gso/approve` or reject with a required `reason` via `POST /v1/gso/reject`. `GET /v1/gso/history` supports `status` filter: `approved`, `rejected`, or `auto_approved`.
 
 **Scrapeyard UX:** after scan, use `existing_transfer_id` and `existing_status`. If status is `pending_gso`, show awaiting GSO approval. When `dispatched`, drive accept/reject. Pass that `transfer_id` to accept/reject endpoints. For **P-items** (`is_p_item: true` on scan payload), after accept show a **Shred Save** action that calls `POST /v1/scrapeyard/shred`.
 
@@ -452,7 +479,7 @@ sequenceDiagram
 - If `existing_status` is `pending_gso` and the item is past the auto-approve window (2h), scanning may auto-promote it to `dispatched` server-side.
 - Returns **422** if PLU code is unknown or item UOM is `EA` (use manual dispatch).
 - **`is_p_item`:** when `true`, `item_code_8` is `null` — use `item_name` + `plu_code` for display.
-- **`requires_material_state`:** when `true`, dispatch must include `material_state` (`shredded` | `not_shredded`).
+- **`requires_material_state`:** always `false` — `material_state` is derived server-side on dispatch (do not send from client).
 
 **P-item scan example** (`CODE: P159`):
 ```json
@@ -465,7 +492,7 @@ sequenceDiagram
     "item_name": "Cartons",
     "is_p_item": true,
     "is_shreddable": true,
-    "requires_material_state": true,
+    "requires_material_state": false,
     "uom": "KG",
     "quantity": "12.000",
     "location": 3
@@ -502,14 +529,13 @@ sequenceDiagram
 ```json
 {
   "qr_raw": "<same scanned string>",
-  "employee_id": 1,
-  "material_state": "not_shredded"
+  "employee_id": 1
 }
 ```
 
-`material_state` is **required** when the item is shreddable; omit or pass `not_shredded` for other KG items.
+Do **not** send `material_state` — the server sets it from `is_p_item` (P-items → `not_shredded`, non-P → `shredded`).
 
-Returns **403** if QR location plant does not match logged-in plant. Returns **422** for EA items.
+Returns **403** if QR location plant does not match logged-in plant. Returns **422** for EA items (use manual dispatch).
 
 **Response:** full `TransferResponse` (see below) with `status: "pending_gso"` (when `GSO_APPROVAL_ENABLED=true`, the default).
 
@@ -551,9 +577,9 @@ Returns **403** if QR location plant does not match logged-in plant. Returns **4
 
 > Manual dispatch (`POST /v1/shopfloor/dispatch/manual`) returns the same shape with `status: "pending_gso"` and `dispatch_method: "manual"`.
 
-### 2b. Dispatch — Manual (Shopfloor, EA items)
+### 2b. Dispatch — Manual (Shopfloor, any UOM)
 
-`GET /v1/shopfloor/items` — list active EA items for manual dispatch dropdowns.
+`GET /v1/shopfloor/items` — list active items for manual dispatch dropdowns. Optional query: `?uom=KG` or `?uom=EA` to filter.
 
 **Response:**
 ```json
@@ -576,14 +602,30 @@ Returns **403** if QR location plant does not match logged-in plant. Returns **4
 {
   "item_master_id": 12,
   "quantity": "10",
-  "material_state": "not_shredded",
   "employee_id": 1
+}
+```
+
+**Manual dispatch response example:**
+```json
+{
+  "id": 2,
+  "item_code": "1000090021",
+  "item_name": "EMPTY IRON DRUM 200LTR",
+  "uom": "EA",
+  "quantity_sent": "10.000",
+  "dispatch_method": "manual",
+  "material_state": "shredded",
+  "status": "pending_gso",
+  "dispatched_at": 1782396250,
+  "events": [],
+  "rejection": null
 }
 ```
 
 ### 2c. GSO — Pending queue, approve, reject
 
-GSO role only. Single shared GSO account reviews dispatches from **all plants**.
+GSO role only. **One GSO login per plant** (`GSO-UDE`, `GSO-UTE`, `GSO-U535`) — pending/history are scoped to the logged-in plant (`plant_id` in JWT).
 
 #### Pending list (Dispatch Approval screen)
 
@@ -604,6 +646,9 @@ Server auto-approves any overdue items (older than `GSO_AUTO_APPROVE_HOURS`, def
   "uom": "KG",
   "quantity_sent": "7.350",
   "status": "pending_gso",
+  "display_status": "Pending GSO",
+  "rejection_source": null,
+  "rejection_reason": null,
   "dispatched_at": 1782396208,
   "gso_approved_at": null,
   "gso_auto_approved": false,
@@ -627,7 +672,24 @@ Use `dispatched_at` for the “Sent on” column in the UI.
 }
 ```
 
-**Response:** `status: "dispatched"`, `gso_approved_at` set, `gso_auto_approved: false`. Timeline adds `event_type: "gso_approved"`.
+**Response:** full `TransferResponse` with `status: "dispatched"`, `gso_approved_at` set, `gso_auto_approved: false`. Timeline adds `event_type: "gso_approved"`.
+
+```json
+{
+  "id": 1,
+  "status": "dispatched",
+  "gso_approved_at": 1782396210,
+  "gso_auto_approved": false,
+  "events": [
+    {
+      "event_type": "gso_approved",
+      "actor_role": "gso",
+      "employee_name": "Employee 1",
+      "created_at": 1782396210
+    }
+  ]
+}
+```
 
 Returns **400** if transfer is not `pending_gso`.
 
@@ -644,7 +706,7 @@ Returns **400** if transfer is not `pending_gso`.
 
 `reason` is **required** (non-empty string). Disable the reject button in UI until the user enters text.
 
-**Response:** `status: "gso_rejected"`, `gso_rejection_reason` set, `gso_rejected_at` set. Timeline adds `event_type: "gso_rejected"` with `comment` = reason.
+**Response:** full `TransferResponse` with `status: "gso_rejected"`, `gso_rejection_reason` set, `gso_rejected_at` set. Timeline adds `event_type: "gso_rejected"` with `comment` = reason.
 
 Returns **400** if transfer is not `pending_gso`. Returns **422** if `reason` is empty.
 
@@ -660,7 +722,7 @@ Query params: `page`, `page_size`, `item_code`, `material_name`, `date_from`, `d
 | `auto_approved` | System auto-approved after timeout (`gso_auto_approved: true`) |
 | `rejected` | `gso_rejected` or `gso_acknowledged` |
 
-Omit `status` to list all past GSO decisions.
+Omit `status` to list **GSO-touched transfers only** for the logged-in plant (approved, auto-approved, or GSO-rejected). Invalid `status` value → **422**.
 
 **Status badge mapping (History screen):**
 
@@ -681,6 +743,8 @@ Omit `status` to list all past GSO decisions.
 ```
 
 Returns **400** if transfer is not `dispatched` (e.g. still `pending_gso`).
+
+**Response:** full `TransferResponse` with `status: "accepted"`, `processed_at` set, and `event_type: "accepted"` in timeline.
 
 ### 4. Reject (Scrapeyard)
 
@@ -722,6 +786,49 @@ Returns **400** if transfer is not `dispatched` (e.g. still `pending_gso`).
 }
 ```
 
+**Response:** full `TransferResponse` with `status: "rejected"`, structured `rejection` object, and `event_type: "rejected"` in timeline.
+
+### 4a. Scrapeyard inventory
+
+`GET /v1/scrapeyard/ready-for-sale` — non-P saleable stock at the logged-in scrapeyard.
+
+Query params: `item_code`, `material_name`, `page`, `page_size`.
+
+**Response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "item_code": "1000090313",
+      "material_name": "CORRUGATED BOX SCRAP",
+      "available_qty": "12.350",
+      "uom": "KG"
+    }
+  ]
+}
+```
+
+`GET /v1/scrapeyard/shred-queue` — accepted P-items awaiting shred.
+
+Query params: `item_code`, `material_name`, `page`, `page_size`.
+
+**Response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "transfer_id": 42,
+      "item_code": "P159",
+      "item_name": "Cartons",
+      "uom": "KG",
+      "available_qty": "12.000"
+    }
+  ]
+}
+```
+
 ### 4b. Shred log (Scrapeyard, P-items only)
 
 After accepting a P-item transfer, record shred completion:
@@ -730,12 +837,13 @@ After accepting a P-item transfer, record shred completion:
 ```json
 {
   "transfer_id": 1,
-  "quantity_kg": "12.000",
+  "quantity_pre_shred": "12.000",
+  "quantity_post_shred": "11.000",
   "employee_id": 13
 }
 ```
 
-Validation: transfer must be `accepted`, `is_p_item=true`, and no existing shred log for that transfer. Output 8-digit code/name come from `item_master.shred_output_*`.
+Validation: transfer must be `accepted`, `is_p_item=true`, no existing shred log, `quantity_post_shred <= quantity_pre_shred`, and post-shred qty must not exceed accepted qty. `quantity_post_shred` feeds saleable inventory. Output 8-digit code/name come from `item_master.shred_output_*`.
 
 **Response (201):**
 ```json
@@ -747,14 +855,16 @@ Validation: transfer must be `accepted`, `is_p_item=true`, and no existing shred
   "input_name": "Cartons",
   "output_item_code": "1000091259",
   "output_name": "CARTONS -JT",
-  "quantity_kg": "12.000",
+  "quantity_pre_shred": "12.000",
+  "quantity_post_shred": "11.000",
+  "process_loss": "1.000",
   "shredded_at": 1782396300
 }
 ```
 
 `GET /v1/scrapeyard/shred-log` — list for logged-in scrapeyard.
 
-Query params: `output_item_code`, `date_from`, `date_to` (unix seconds), `page`, `page_size`.
+Query params: `item_code`, `material_name`, `date_from`, `date_to` (unix seconds), `page`, `page_size`.
 
 **List response:**
 ```json
@@ -769,7 +879,9 @@ Query params: `output_item_code`, `date_from`, `date_to` (unix seconds), `page`,
       "input_name": "Cartons",
       "output_item_code": "1000091259",
       "output_name": "CARTONS -JT",
-      "quantity_kg": "12.000",
+      "quantity_pre_shred": "12.000",
+      "quantity_post_shred": "11.000",
+      "process_loss": "1.000",
       "shredded_at": 1782396300
     }
   ]
@@ -814,6 +926,138 @@ No request body. Returns **400** if transfer is not in `gso_rejected` status.
 **Response:** `status: "gso_acknowledged"`. Timeline adds `event_type: "gso_acknowledged"`.
 
 Show `gso_rejection_reason` from the transfer detail on the rejection screen.
+
+---
+
+## Security — Material Sales
+
+Security role records outbound material sales. Inventory is deducted immediately; sale stays `status: pending` until admin approves via `/v1/material-sales/*`.
+
+**Security app flow:** login → employee picker → **Available materials** (`GET /v1/security/available-materials`) → select vendor (`GET /v1/vendors`) → record sale (`POST /v1/security/sales`) → **History** (`GET /v1/security/sales/history`).
+
+### Available materials
+
+`GET /v1/security/available-materials`
+
+Query params: `item_code`, `material_name`, `page`, `page_size`.
+
+**Response:**
+```json
+{
+  "total": 2,
+  "items": [
+    {
+      "item_code": "1000090313",
+      "material_name": "CORRUGATED BOX SCRAP",
+      "available_qty": "12.350",
+      "uom": "KG"
+    }
+  ]
+}
+```
+
+### Record sale
+
+`POST /v1/security/sales`
+
+```json
+{
+  "item_code": "1000090313",
+  "vendor_id": 1,
+  "vehicle_number": "HR32EA1212",
+  "quantity_sold": "5.000",
+  "total_weight_kg": "5.000",
+  "employee_id": 20
+}
+```
+
+`total_weight_kg` is optional. Returns **422** if `quantity_sold` exceeds available inventory.
+
+**Response (201):**
+```json
+{
+  "id": 1,
+  "item_code": "1000090313",
+  "item_name": "CORRUGATED BOX SCRAP",
+  "uom": "KG",
+  "available_qty_at_sale": "12.350",
+  "quantity_sold": "5.000",
+  "total_weight_kg": "5.000",
+  "vendor_id": 1,
+  "vendor_name": "Radheman Enterprises",
+  "vehicle_number": "HR32EA1212",
+  "amount_inr": "35.00",
+  "status": "pending",
+  "display_status": "Material Sale",
+  "recorded_at": 1782396400,
+  "events": [
+    {
+      "event_type": "material_sold",
+      "actor_role": "security",
+      "employee_name": "Security Employee",
+      "quantity": "5.000",
+      "comment": null,
+      "created_at": 1782396400
+    }
+  ]
+}
+```
+
+### Sale history
+
+`GET /v1/security/sales/history`
+
+Query params: `item_code`, `material_name`, `vendor_id`, `status` (`pending` | `approved` | `rejected`), `date_from`, `date_to` (YYYY-MM-DD), `page`, `page_size`.
+
+**Response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 1,
+      "item_code": "1000090313",
+      "item_name": "CORRUGATED BOX SCRAP",
+      "uom": "KG",
+      "quantity_sold": "5.000",
+      "vendor_name": "Radheman Enterprises",
+      "status": "pending",
+      "display_status": "Material Sale",
+      "recorded_at": 1782396400
+    }
+  ]
+}
+```
+
+### Sale detail
+
+`GET /v1/security/sales/{id}` — same `MaterialSaleResponse` shape as create (includes `events` timeline). After admin review, timeline may include `event_type: "approved"` or `"rejected"`.
+
+### Vendors (Security read-only)
+
+`GET /v1/vendors?search=&vendor_code=` — list active vendors for sale dropdown.
+
+**Response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 1,
+      "name": "Radheman Enterprises",
+      "vendor_code": "10245",
+      "email": "vendor@example.com",
+      "contact_person": "Ramesh",
+      "phone": "9876543210",
+      "address": null,
+      "gst_number": null,
+      "is_active": true,
+      "created_at": 1782396000,
+      "updated_at": null
+    }
+  ]
+}
+```
 
 ---
 
@@ -952,11 +1196,29 @@ The 8-digit identity (`1000091259` / `CARTONS -JT`) appears only after calling `
   "is_p_item": false,
   "is_shreddable": false,
   "status": "accepted",
+  "display_status": "Accepted by SY",
+  "rejection_source": null,
+  "rejection_reason": null,
   "dispatched_at": 1782396208,
   "processed_at": 1782396216,
   "gso_approved_at": 1782396210,
   "gso_auto_approved": false,
   "gso_rejected_at": null
+}
+```
+
+**Rejected list item example** (`GET /v1/shopfloor/rejected` — scrapeyard or GSO rejection):
+```json
+{
+  "id": 3,
+  "item_code": "1000090313",
+  "item_name": "CORRUGATED BOX SCRAP",
+  "status": "gso_rejected",
+  "display_status": "Rejected by GSO",
+  "rejection_source": "gso",
+  "rejection_reason": "Quantity was short by 10 units",
+  "dispatched_at": 1782396208,
+  "gso_rejected_at": 1782396212
 }
 ```
 
@@ -973,16 +1235,18 @@ Query params: `page`, `page_size` (max 200), `status`, `material_state` (`shredd
 | Role | Scope |
 |------|-------|
 | Shopfloor | Auto-filtered to **logged-in plant** (`plant_id` param ignored) |
-| GSO | **All plants** (no plant filter) |
+| GSO | Auto-filtered to **logged-in plant** (`plant_id` in JWT) |
 | Scrapeyard | Auto-filtered to **logged-in scrapeyard** |
 | Admin | All plants; optional `plant_id` filter |
+
+List items include `display_status` for UI badges. Rejected lists also include `rejection_source` (`"scrapeyard"` | `"gso"`) and `rejection_reason`.
 
 Example:
 ```
 GET /v1/transfers/history?page=1&page_size=50&status=accepted&date_from=2026-01-01&date_to=2026-06-30&item_code=1313&material_name=SCRAP
 ```
 
-`GET /v1/shopfloor/rejected` — scrapeyard-rejected transfers for logged-in plant awaiting acknowledgement (supports `page`, `page_size`, `item_code`, `material_name`).
+`GET /v1/shopfloor/rejected` — scrapeyard **and** GSO-rejected transfers for logged-in plant awaiting acknowledgement (supports `page`, `page_size`, `item_code`, `material_name`). Use `rejection_source` to route acknowledge to the correct endpoint.
 
 `GET /v1/shopfloor/gso-rejected` — GSO-rejected transfers for logged-in plant awaiting acknowledgement (same query params).
 
@@ -1040,6 +1304,61 @@ List items include `shred_output_name` and `rate_inr` (primary vendor rate) for 
 
 **Item response fields** (list + detail): `id`, `plu_code`, `item_code` (null for P-items), `name`, `uom`, `is_shreddable`, `is_p_item`, `shred_output_item_code`, `shred_output_name`, `is_active`, `created_at`, `updated_at`.
 
+**List response example** (`GET /v1/items`):
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 1,
+      "plu_code": "1313",
+      "item_code": "1000090313",
+      "name": "CORRUGATED BOX SCRAP",
+      "uom": "KG",
+      "is_shreddable": false,
+      "is_p_item": false,
+      "shred_output_name": null,
+      "rate_inr": "7.00",
+      "is_active": true
+    }
+  ]
+}
+```
+
+**Detail response example** (`GET /v1/items/{id}`):
+```json
+{
+  "id": 1,
+  "plu_code": "1313",
+  "item_code": "1000090313",
+  "name": "CORRUGATED BOX SCRAP",
+  "uom": "KG",
+  "is_shreddable": false,
+  "is_p_item": false,
+  "shred_output_item_code": null,
+  "shred_output_name": null,
+  "is_active": true,
+  "created_at": 1782395000,
+  "updated_at": 1782395000
+}
+```
+
+**Post-shred options** (`GET /v1/items/post-shred-options`):
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 5,
+      "plu_code": "1259",
+      "item_code": "1000091259",
+      "name": "CARTONS -JT",
+      "uom": "KG"
+    }
+  ]
+}
+```
+
 > Multiple PLUs may share the same `item_code` (8-digit SAP code) — e.g. `1750` and `1766` both use `1000090766`.
 
 `GET /v1/items/{id}` · `PATCH /v1/items/{id}` · `DELETE /v1/items/{id}` (soft delete)
@@ -1050,7 +1369,31 @@ Seed client data: `python scripts/import_client_data.py --item-code <path> --cli
 
 ## Admin — Vendors
 
-`GET /v1/vendors?search=&vendor_code=` · `POST /v1/vendors` · `GET/PATCH/DELETE /v1/vendors/{id}`
+`GET /v1/vendors?search=&vendor_code=` — admin and security (read-only for security).
+
+**List response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 1,
+      "name": "Seven Star Service",
+      "vendor_code": "10245",
+      "email": "vendor@example.com",
+      "contact_person": "Ramesh",
+      "phone": "9876543210",
+      "address": "Assam",
+      "gst_number": "27AAAAA0000A1Z5",
+      "is_active": true,
+      "created_at": 1782396000,
+      "updated_at": null
+    }
+  ]
+}
+```
+
+`POST /v1/vendors` · `GET/PATCH/DELETE /v1/vendors/{id}` — admin only.
 
 **Create vendor** with optional SKU assignments:
 ```json
@@ -1065,10 +1408,31 @@ Seed client data: `python scripts/import_client_data.py --item-code <path> --cli
 }
 ```
 
-Vendor item assignments:
+**Create response (201):** same shape as vendor list item above.
+
+Vendor item assignments (admin only):
 - `GET /v1/vendors/{id}/items`
 - `POST /v1/vendors/{id}/items` — `{ "item_id": 1, "rate_inr": "7.00" }`
-- `PATCH /v1/vendors/{id}/items/{vendor_item_id}` · `DELETE /v1/vendors/{id}/items/{vendor_item_id}`
+- `PATCH /v1/vendors/{id}/items/{vendor_item_id}` · `DELETE /v1/vendors/{id}/items/{vendor_item_id}` (204, no body)
+
+**Vendor item list response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 10,
+      "vendor_id": 1,
+      "item_id": 1,
+      "plu_code": "1313",
+      "item_code": "1000090313",
+      "item_name": "CORRUGATED BOX SCRAP",
+      "uom": "KG",
+      "rate_inr": "7.00"
+    }
+  ]
+}
+```
 
 ---
 
@@ -1078,11 +1442,32 @@ Vendor item assignments:
 
 `GET /v1/plants?search=UDE`
 
-**Response:** `{ "total": N, "items": [ PlantResponse, ... ] }`
+**Response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 1,
+      "code": "UDE",
+      "name": "Unit 3",
+      "login_id": "UDE",
+      "qr_location": 3,
+      "address": "Doom Dooma, Assam",
+      "is_active": true,
+      "employees": [
+        { "id": 1, "name": "Riya" },
+        { "id": 2, "name": "Rishabh" }
+      ],
+      "generated_password": null
+    }
+  ]
+}
+```
 
 ### Get plant
 
-`GET /v1/plants/{id}`
+`GET /v1/plants/{id}` — same shape as list item.
 
 ### Create plant
 
@@ -1100,6 +1485,8 @@ Vendor item assignments:
 ```
 
 `qr_location` must be unique across plants.
+
+**Create response (201):** same as `PlantResponse`; includes `generated_password` when password was set.
 
 ### Update plant
 
@@ -1182,7 +1569,31 @@ Single shared security account for outbound sales.
 
 `GET /v1/security-config` · `PATCH /v1/security-config`
 
-Same request/response shape as scrapeyard config (without `plant_id`). `generated_password` is returned when password is set on PATCH.
+**GET response:**
+```json
+{
+  "id": 1,
+  "name": "Security Gate",
+  "login_id": "Security-1",
+  "is_active": true,
+  "employees": [
+    { "id": 20, "name": "Security Employee" }
+  ],
+  "generated_password": null
+}
+```
+
+Same request/response shape as scrapeyard config (without `plant_id`). **PATCH** — all fields optional:
+```json
+{
+  "name": "Security Gate",
+  "login_id": "Security-1",
+  "password": "newpass",
+  "employee_names": ["Worker A", "Worker B"]
+}
+```
+
+`generated_password` is returned when password is set on PATCH.
 
 ---
 
@@ -1221,13 +1632,65 @@ Security records sales with `status: pending`. Admin lists, approves, or rejects
 
 Default `status=pending`.
 
+**Response:**
+```json
+{
+  "total": 1,
+  "items": [
+    {
+      "id": 1,
+      "item_code": "1000090313",
+      "item_name": "CORRUGATED BOX SCRAP",
+      "uom": "KG",
+      "quantity_sold": "5.000",
+      "vendor_name": "Radheman Enterprises",
+      "status": "pending",
+      "display_status": "Material Sale",
+      "recorded_at": 1782396400
+    }
+  ]
+}
+```
+
 ### Get sale detail
 
 `GET /v1/material-sales/{id}`
 
+**Response:**
+```json
+{
+  "id": 1,
+  "item_code": "1000090313",
+  "item_name": "CORRUGATED BOX SCRAP",
+  "uom": "KG",
+  "available_qty_at_sale": "12.350",
+  "quantity_sold": "5.000",
+  "total_weight_kg": "5.000",
+  "vendor_id": 1,
+  "vendor_name": "Radheman Enterprises",
+  "vehicle_number": "HR32EA1212",
+  "amount_inr": "35.00",
+  "status": "pending",
+  "display_status": "Material Sale",
+  "recorded_at": 1782396400,
+  "events": [
+    {
+      "event_type": "material_sold",
+      "actor_role": "security",
+      "employee_name": "Security Employee",
+      "quantity": "5.000",
+      "comment": null,
+      "created_at": 1782396400
+    }
+  ]
+}
+```
+
 ### Approve
 
 `POST /v1/material-sales/{id}/approve` — no body.
+
+**Response:** same shape as detail with `status: "approved"`, `display_status: "Approved"`, and timeline event `event_type: "approved"`.
 
 ### Reject
 
@@ -1237,6 +1700,8 @@ Default `status=pending`.
   "reason": "Quantity mismatch with gate pass"
 }
 ```
+
+**Response:** same shape as detail with `status: "rejected"`, `display_status: "Rejected"`, and timeline event `event_type: "rejected"` with `comment` = reason.
 
 Reject restores reserved inventory. Approve keeps stock deducted.
 
@@ -1423,12 +1888,12 @@ Recording a sale sets the transfer `status` to **`sold`**.
 
 | Code | Meaning |
 |------|---------|
-| 400 | Invalid employee for plant/scrapeyard/GSO; only **`dispatched`** transfers can be scrapeyard-accepted/rejected; only **`pending_gso`** for GSO approve/reject; only **accepted** transfers can be sold or shredded; only **rejected** transfers can be scrapeyard-acknowledged; only **gso_rejected** for GSO-acknowledge; shred only for P-items |
+| 400 | Invalid employee for plant/scrapeyard/GSO/security; only **`dispatched`** transfers can be scrapeyard-accepted/rejected; only **`pending_gso`** for GSO approve/reject; only **accepted** transfers can be shredded; only **rejected** for scrapeyard-acknowledge; only **gso_rejected** for GSO-acknowledge; shred only for P-items; material sale quantity exceeds inventory |
 | 401 | Missing/invalid token; invalid login credentials |
 | 403 | Wrong role; transfer not for this plant/scrapeyard; shopfloor plant does not match QR location |
 | 404 | Resource not found (transfer, shred log, etc.) |
 | 409 | Duplicate QR (`QR already used with status …`); duplicate login ID; **shred log already exists for transfer** |
-| 422 | Bad QR payload; missing scrapeyard rejection fields; empty GSO `reason`; missing `material_state` for shreddable items; P-item missing shred output mapping |
+| 422 | Bad QR payload; missing scrapeyard rejection fields; empty GSO `reason`; sale quantity exceeds inventory; P-item missing shred output mapping; invalid GSO history `status` |
 
 Error body: `{ "detail": "<message>" }`
 
@@ -1463,7 +1928,15 @@ pending → pending_gso → dispatched → accepted → sold
 | `accepted` | Scrapeyard accepted — for P-items, call `POST /v1/scrapeyard/shred` to record 8-digit output |
 | `rejected` | Scrapeyard rejected |
 | `acknowledged` | Shopfloor acknowledged scrapeyard rejection |
-| `sold` | Admin recorded sale |
+| `sold` | Admin recorded sale (legacy `/v1/sales` flow) |
+
+**Material sale statuses** (Security + Admin approval flow):
+
+| Status | Meaning |
+|--------|---------|
+| `pending` | Security recorded sale; inventory deducted; awaiting admin approval |
+| `approved` | Admin approved; stock stays deducted |
+| `rejected` | Admin rejected; inventory restored |
 
 **GSO auto-approve:** items in `pending_gso` older than `GSO_AUTO_APPROVE_HOURS` (default `2`) are promoted to `dispatched` with `gso_auto_approved: true`.
 
@@ -1479,6 +1952,51 @@ Auto-approve runs:
 
 ---
 
+## Display status reference
+
+Use `display_status` on transfer and material-sale list items for UI badges (server-computed).
+
+### Transfer `display_status` (default / shopfloor context)
+
+| `status` | `display_status` |
+|----------|------------------|
+| `pending_gso` | Pending GSO |
+| `dispatched` | Dispatched |
+| `accepted` | Accepted by SY |
+| `rejected` | Rejected by SY |
+| `acknowledged` | SY Rejection Acknowledged |
+| `gso_rejected` | Rejected by GSO |
+| `gso_acknowledged` | GSO Rejection Acknowledged |
+| `sold` | Sold |
+
+### GSO context (`GET /v1/gso/*`)
+
+| Condition | `display_status` |
+|-----------|------------------|
+| `gso_auto_approved: true` | Auto Approved |
+| `gso_approved_at` set (manual) | Approved by GSO |
+| `gso_rejected` / `gso_acknowledged` | Rejected by GSO |
+| Otherwise | Same as default table |
+
+### Rejection list fields (`GET /v1/shopfloor/rejected`)
+
+| Field | Values |
+|-------|--------|
+| `rejection_source` | `"scrapeyard"` or `"gso"` |
+| `rejection_reason` | Scrapeyard rejection comment or `gso_rejection_reason` |
+
+Route acknowledge to `POST /v1/shopfloor/rejected/{id}/acknowledge` (scrapeyard) or `POST /v1/shopfloor/gso-rejected/{id}/acknowledge` (GSO) based on `rejection_source`.
+
+### Material sale `display_status`
+
+| `status` | `display_status` |
+|----------|------------------|
+| `pending` | Material Sale |
+| `approved` | Approved |
+| `rejected` | Rejected |
+
+---
+
 ## Seeded credentials (after `scripts/seed_data.py`)
 
 | Role | login_id | password | QR location |
@@ -1488,4 +2006,7 @@ Auto-approve runs:
 | UTE | UTE | 1234 | 2 |
 | U535 | U535 | 1234 | 4 |
 | Scrapeyard | SCRAP | 1234 | — |
-| GSO | GSO | 1234 | — |
+| GSO (UDE) | GSO-UDE | 1234 | — |
+| GSO (UTE) | GSO-UTE | 1234 | — |
+| GSO (U535) | GSO-U535 | 1234 | — |
+| Security | Security-1 | 1234 | — |
