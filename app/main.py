@@ -14,6 +14,7 @@ from app.routers.reporting import router as reporting_router
 from app.routers.sales import router as sales_router
 from app.routers.scrapeyard_admin import router as scrapeyard_admin_router
 from app.routers.scrapeyard import router as scrapeyard_router
+from app.routers.security import router as security_router
 from app.routers.shopfloor import router as shopfloor_router
 from app.routers.transfers import router as transfers_router
 from app.routers.vendors import router as vendors_router
@@ -39,6 +40,7 @@ app.include_router(employees_router)
 app.include_router(transfers_router)
 app.include_router(shopfloor_router)
 app.include_router(scrapeyard_router)
+app.include_router(security_router)
 app.include_router(gso_router)
 app.include_router(scrapeyard_admin_router)
 app.include_router(plants_router)

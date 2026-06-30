@@ -10,10 +10,14 @@ from app.auto_tests.conftest import SAMPLE_QR, SAMPLE_QR_UTE
 from app.auto_tests.item_fixtures import seed_ea_item, seed_p_item, seed_test_item
 
 
-def _create_gso(db):
+def _create_gso(db, plant=None):
+    if plant is None:
+        plant = db.query(Plant).filter(Plant.login_id == "UDE").first()
+    login_id = f"GSO-{plant.login_id}" if plant else "GSO"
     gso = Gso(
-        name="General Shift Officer",
-        login_id="GSO",
+        plant_id=plant.id if plant else None,
+        name=f"GSO {plant.name if plant else 'General Shift Officer'}",
+        login_id=login_id,
         password_hash=hash_password("1234"),
         is_active=True,
         created_at=int(time.time()),
@@ -33,9 +37,10 @@ def _create_gso(db):
     return gso, emp
 
 
-def _gso_approve(client, gso_emp, transfer_id):
+def _gso_approve(client, gso_emp, transfer_id, plant_login_id="UDE"):
     gso_token = client.post(
-        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+        "/v1/auth/login",
+        json={"login_id": f"GSO-{plant_login_id}", "password": "1234"},
     ).json()["access_token"]
     response = client.post(
         "/v1/gso/approve",
@@ -98,8 +103,8 @@ def _create_plant(db, code, login_id, qr_location):
 def test_full_lifecycle_dispatch_accept(client, db_session):
     seed_test_item(db_session)
     sy, sy_emp = _create_scrapeyard(db_session)
-    _, gso_emp = _create_gso(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+    _, gso_emp = _create_gso(db_session, ude)
 
     ude_token = client.post(
         "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
@@ -171,8 +176,8 @@ def test_reject_and_acknowledge(client, db_session):
         name="PAPER WASTE",
     )
     sy, sy_emp = _create_scrapeyard(db_session)
-    _, gso_emp = _create_gso(db_session)
     ute, ute_emp = _create_plant(db_session, "UTE", "UTE", 2)
+    _, gso_emp = _create_gso(db_session, ute)
 
     ute_token = client.post(
         "/v1/auth/login", json={"login_id": "UTE", "password": "1234"}
@@ -189,7 +194,7 @@ def test_reject_and_acknowledge(client, db_session):
     assert dispatch.status_code == 200
     transfer_id = dispatch.json()["id"]
 
-    _gso_approve(client, gso_emp, transfer_id)
+    _gso_approve(client, gso_emp, transfer_id, plant_login_id="UTE")
 
     sy_token = client.post(
         "/v1/auth/login", json={"login_id": "SCRAP", "password": "1234"}
@@ -262,7 +267,6 @@ def test_manual_ea_dispatch(client, db_session):
         json={
             "item_master_id": ea_item.id,
             "quantity": "10",
-            "material_state": "not_shredded",
             "employee_id": ude_emp.id,
         },
     )
@@ -297,7 +301,7 @@ LOCATION: 3"""
     assert "manual dispatch" in dispatch.json()["detail"].lower()
 
 
-def test_shreddable_item_requires_material_state(client, db_session):
+def test_p_item_derives_not_shredded_material_state(client, db_session):
     seed_p_item(
         db_session,
         plu_code="P106",
@@ -320,24 +324,13 @@ GROSS WT.: 5.000 Kg"""
         "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
     ).json()["access_token"]
 
-    missing_state = client.post(
+    dispatch = client.post(
         "/v1/shopfloor/dispatch",
         headers={"Authorization": f"Bearer {ude_token}"},
         json={"qr_raw": shreddable_qr, "employee_id": ude_emp.id},
     )
-    assert missing_state.status_code == 422
-
-    dispatch = client.post(
-        "/v1/shopfloor/dispatch",
-        headers={"Authorization": f"Bearer {ude_token}"},
-        json={
-            "qr_raw": shreddable_qr,
-            "employee_id": ude_emp.id,
-            "material_state": "shredded",
-        },
-    )
     assert dispatch.status_code == 200
-    assert dispatch.json()["material_state"] == "shredded"
+    assert dispatch.json()["material_state"] == "not_shredded"
     assert dispatch.json()["is_shreddable"] is True
     assert dispatch.json()["is_p_item"] is True
     assert dispatch.json()["item_code"] == "P106"
@@ -347,8 +340,8 @@ GROSS WT.: 5.000 Kg"""
 def test_p_item_dispatch_hides_8digit_until_shred(client, db_session):
     seed_p_item(db_session)
     sy, sy_emp = _create_scrapeyard(db_session)
-    _, gso_emp = _create_gso(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+    _, gso_emp = _create_gso(db_session, ude)
 
     p_qr = """HIDUSTAN UNILEVER LIMITED
 DATE: 23-06-2026
@@ -376,11 +369,7 @@ GROSS WT.: 12.000 Kg"""
     dispatch = client.post(
         "/v1/shopfloor/dispatch",
         headers={"Authorization": f"Bearer {ude_token}"},
-        json={
-            "qr_raw": p_qr,
-            "employee_id": ude_emp.id,
-            "material_state": "not_shredded",
-        },
+        json={"qr_raw": p_qr, "employee_id": ude_emp.id},
     )
     assert dispatch.status_code == 200
     body = dispatch.json()
@@ -409,7 +398,8 @@ GROSS WT.: 12.000 Kg"""
         headers={"Authorization": f"Bearer {sy_token}"},
         json={
             "transfer_id": transfer_id,
-            "quantity_kg": "12.000",
+            "quantity_pre_shred": "12.000",
+            "quantity_post_shred": "11.000",
             "employee_id": sy_emp.id,
         },
     )
@@ -419,7 +409,9 @@ GROSS WT.: 12.000 Kg"""
     assert log["input_name"] == "Cartons"
     assert log["output_item_code"] == "1000091259"
     assert log["output_name"] == "CARTONS -JT"
-    assert log["quantity_kg"] == "12.000"
+    assert log["quantity_pre_shred"] == "12.000"
+    assert log["quantity_post_shred"] == "11.000"
+    assert log["process_loss"] == "1.000"
 
     logs = client.get(
         "/v1/scrapeyard/shred-log",
@@ -464,14 +456,14 @@ def test_admin_plant_crud(client, db_session):
 def test_gso_reject_and_shopfloor_acknowledge(client, db_session):
     seed_test_item(db_session)
     _create_scrapeyard(db_session)
-    _, gso_emp = _create_gso(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+    _, gso_emp = _create_gso(db_session, ude)
 
     ude_token = client.post(
         "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
     ).json()["access_token"]
     gso_token = client.post(
-        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+        "/v1/auth/login", json={"login_id": "GSO-UDE", "password": "1234"}
     ).json()["access_token"]
 
     dispatch = client.post(
@@ -512,8 +504,8 @@ def test_gso_auto_approve_after_two_hours(client, db_session):
 
     seed_test_item(db_session)
     _create_scrapeyard(db_session)
-    _create_gso(db_session)
     ude, ude_emp = _create_plant(db_session, "UDE", "UDE", 3)
+    _create_gso(db_session, ude)
 
     ude_token = client.post(
         "/v1/auth/login", json={"login_id": "UDE", "password": "1234"}
@@ -532,7 +524,7 @@ def test_gso_auto_approve_after_two_hours(client, db_session):
     db_session.commit()
 
     gso_token = client.post(
-        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+        "/v1/auth/login", json={"login_id": "GSO-UDE", "password": "1234"}
     ).json()["access_token"]
 
     pending = client.get(
@@ -552,12 +544,14 @@ def test_gso_auto_approve_after_two_hours(client, db_session):
 
 
 def test_gso_login_returns_employees(client, db_session):
-    _create_gso(db_session)
+    ude, _ = _create_plant(db_session, "UDE", "UDE", 3)
+    _create_gso(db_session, ude)
     response = client.post(
-        "/v1/auth/login", json={"login_id": "GSO", "password": "1234"}
+        "/v1/auth/login", json={"login_id": "GSO-UDE", "password": "1234"}
     )
     assert response.status_code == 200
     body = response.json()
     assert body["role"] == "gso"
-    assert body["gso_name"] == "General Shift Officer"
+    assert body["plant_id"] == ude.id
+    assert body["plant_name"] == "UDE"
     assert len(body["employees"]) == 1

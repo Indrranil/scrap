@@ -62,10 +62,15 @@ def transfer_history(
 
     shopfloor_plant_id = None
     scrapeyard_id = None
+    display_context = "shopfloor"
     if role == "shopfloor":
         shopfloor_plant_id = user.get("plant_id")
     elif role == "scrapeyard":
         scrapeyard_id = user.get("scrapeyard_id")
+        display_context = "scrapeyard"
+    elif role == "gso":
+        shopfloor_plant_id = user.get("plant_id")
+        display_context = "gso"
     elif role == "admin" and plant_id:
         shopfloor_plant_id = plant_id
 
@@ -83,6 +88,7 @@ def transfer_history(
         material_state=material_state,
         date_from=_parse_date(date_from),
         date_to=date_to_ts,
+        display_context=display_context,
         skip=(page - 1) * page_size,
         limit=page_size,
     )

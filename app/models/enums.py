@@ -34,7 +34,22 @@ class ActorRole(str, enum.Enum):
     SHOPFLOOR = "shopfloor"
     GSO = "gso"
     SCRAPEYARD = "scrapeyard"
+    SECURITY = "security"
     ADMIN = "admin"
+
+
+class InventoryMovementType(str, enum.Enum):
+    ACCEPT_NON_P = "accept_non_p"
+    SHRED_OUTPUT = "shred_output"
+    SALE_RESERVE = "sale_reserve"
+    SALE_RELEASE = "sale_release"
+    SALE_APPROVE = "sale_approve"
+
+
+class MaterialSaleStatus(str, enum.Enum):
+    PENDING = "pending"
+    APPROVED = "approved"
+    REJECTED = "rejected"
 
 
 class DispatchMethod(str, enum.Enum):

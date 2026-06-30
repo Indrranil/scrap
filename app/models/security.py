@@ -1,13 +1,12 @@
-from sqlalchemy import BigInteger, Boolean, Column, ForeignKey, Integer, String
+from sqlalchemy import BigInteger, Boolean, Column, Integer, String
 
 from app.database.connection import Base
 
 
-class Gso(Base):
-    __tablename__ = "gso"
+class Security(Base):
+    __tablename__ = "security"
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    plant_id = Column(Integer, ForeignKey("plant.id"), nullable=True, unique=True, index=True)
     name = Column(String(255), nullable=False)
     login_id = Column(String(255), unique=True, nullable=False, index=True)
     password_hash = Column(String(255), nullable=False)

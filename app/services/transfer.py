@@ -38,10 +38,18 @@ from app.schemas.transfer import (
     TransferResponse,
 )
 from app.services.gso_config import gso_approval_enabled, gso_auto_approve_seconds
+from app.services.inventory import inventory_service
 from app.services.item_master import item_master_service
 from app.services.plant_resolver import resolve_plant_by_qr_location
 from app.services.qr_parser import parse_qr_payload
 from app.services.scrapeyard import scrapeyard_service
+from app.services.status_display import (
+    compute_gso_display_status,
+    compute_scrapeyard_display_status,
+    compute_transfer_display_status,
+    rejection_source_for_status,
+)
+from app.models.enums import InventoryMovementType
 
 
 REDISPATCHABLE_STATUSES = {
@@ -108,19 +116,10 @@ class TransferService:
         self._auto_approve_transfer(db, transfer, now)
         db.commit()
         db.refresh(transfer)
-    def _resolve_material_state(
-        self,
-        item: ItemMaster,
-        requested: Optional[MaterialState],
-    ) -> MaterialState:
-        if not item.is_shreddable:
+    def _derive_material_state(self, item: ItemMaster) -> MaterialState:
+        if item.is_p_item:
             return MaterialState.NOT_SHREDDED
-        if requested is None:
-            raise HTTPException(
-                status_code=422,
-                detail="material_state is required for shreddable items",
-            )
-        return requested
+        return MaterialState.SHREDDED
 
     def _enrich_payload_from_item(self, db: Session, payload) -> None:
         item = item_master_service.get_by_plu_code(db, payload.plu_code or payload.item_code)
@@ -140,7 +139,7 @@ class TransferService:
         payload.plu_code = item.plu_code
         payload.is_p_item = item.is_p_item
         payload.is_shreddable = item.is_shreddable
-        payload.requires_material_state = item.is_shreddable
+        payload.requires_material_state = False
         if item.is_p_item:
             payload.item_code_8 = None
         else:
@@ -259,12 +258,33 @@ class TransferService:
             raise HTTPException(status_code=404, detail="Transfer not found")
         return self._build_response(db, transfer)
 
+    def _rejection_reason_for_transfer(self, db: Session, transfer: Transfer) -> Optional[str]:
+        if transfer.status == TransferStatus.GSO_REJECTED:
+            return transfer.gso_rejection_reason
+        if transfer.status == TransferStatus.REJECTED:
+            detail = (
+                db.query(RejectionDetail)
+                .filter(RejectionDetail.transfer_id == transfer.id)
+                .first()
+            )
+            if detail:
+                return detail.comment
+        return None
+
+    def _list_item_display_status(self, transfer: Transfer, display_context: str) -> str:
+        if display_context == "gso":
+            return compute_gso_display_status(transfer)
+        if display_context == "scrapeyard":
+            return compute_scrapeyard_display_status(transfer.status)
+        return compute_transfer_display_status(transfer.status)
+
     def list_transfers(
         self,
         db: Session,
         *,
         shopfloor_plant_id: Optional[int] = None,
         scrapeyard_id: Optional[int] = None,
+        gso_plant_id: Optional[int] = None,
         item_code: Optional[str] = None,
         material_name: Optional[str] = None,
         status: Optional[TransferStatus] = None,
@@ -272,9 +292,12 @@ class TransferService:
         date_from: Optional[int] = None,
         date_to: Optional[int] = None,
         rejected_only: bool = False,
+        all_rejected_only: bool = False,
         gso_rejected_only: bool = False,
         gso_pending_only: bool = False,
+        gso_history_only: bool = False,
         gso_history_status: Optional[str] = None,
+        display_context: str = "shopfloor",
         skip: int = 0,
         limit: int = 50,
     ) -> tuple[int, List[TransferListItem]]:
@@ -284,6 +307,8 @@ class TransferService:
             query = query.filter(Transfer.shopfloor_plant_id == shopfloor_plant_id)
         if scrapeyard_id:
             query = query.filter(Transfer.scrapeyard_id == scrapeyard_id)
+        if gso_plant_id:
+            query = query.filter(Transfer.shopfloor_plant_id == gso_plant_id)
 
         if item_code:
             query = query.filter(
@@ -298,10 +323,29 @@ class TransferService:
             query = query.filter(Transfer.material_state == material_state)
         if rejected_only:
             query = query.filter(Transfer.status == TransferStatus.REJECTED)
+        if all_rejected_only:
+            query = query.filter(
+                Transfer.status.in_(
+                    [TransferStatus.REJECTED, TransferStatus.GSO_REJECTED]
+                )
+            )
         if gso_rejected_only:
             query = query.filter(Transfer.status == TransferStatus.GSO_REJECTED)
         if gso_pending_only:
             query = query.filter(Transfer.status == TransferStatus.PENDING_GSO)
+        if gso_history_only and not gso_history_status:
+            query = query.filter(
+                (Transfer.gso_approved_at.isnot(None))
+                | (Transfer.gso_auto_approved.is_(True))
+                | (
+                    Transfer.status.in_(
+                        [
+                            TransferStatus.GSO_REJECTED,
+                            TransferStatus.GSO_ACKNOWLEDGED,
+                        ]
+                    )
+                )
+            )
         if gso_history_status == "approved":
             query = query.filter(
                 Transfer.gso_approved_at.isnot(None),
@@ -342,11 +386,15 @@ class TransferService:
                 is_p_item=t.is_p_item,
                 is_shreddable=self._transfer_is_shreddable(db, t),
                 status=t.status,
+                display_status=self._list_item_display_status(t, display_context),
+                rejection_source=rejection_source_for_status(t.status),
+                rejection_reason=self._rejection_reason_for_transfer(db, t),
                 dispatched_at=t.dispatched_at,
                 processed_at=t.processed_at,
                 gso_approved_at=t.gso_approved_at,
                 gso_auto_approved=t.gso_auto_approved,
                 gso_rejected_at=t.gso_rejected_at,
+                gso_rejection_reason=t.gso_rejection_reason,
             )
             for t in transfers
         ]
@@ -368,7 +416,7 @@ class TransferService:
         if not item:
             raise HTTPException(status_code=422, detail="Unknown item code")
 
-        material_state = self._resolve_material_state(item, data.material_state)
+        material_state = self._derive_material_state(item)
 
         if payload.location is None:
             raise HTTPException(
@@ -481,17 +529,14 @@ class TransferService:
         employee = validate_plant_employee(db, logged_in_plant_id, data.employee_id)
         item = item_master_service.get_by_id(db, data.item_master_id)
 
-        if item.uom.upper() != "EA":
-            raise HTTPException(
-                status_code=422,
-                detail="KG items must use QR dispatch",
-            )
-
-        material_state = self._resolve_material_state(item, data.material_state)
+        material_state = self._derive_material_state(item)
         scrapeyard = scrapeyard_service.get_active(db)
         now = int(time.time())
         post_dispatch_status = self._post_dispatch_status()
-        canonical_item_code = item.item_code or item.plu_code
+        if item.is_p_item:
+            stored_item_code = item.plu_code
+        else:
+            stored_item_code = item.item_code or item.plu_code
         qr_raw = (
             f"MANUAL DISPATCH\nPLU: {item.plu_code}\nNAME: {item.name}\n"
             f"QTY: {data.quantity}\nPLANT: {logged_in_plant_id}\nAT: {now}"
@@ -505,13 +550,14 @@ class TransferService:
             scrapeyard_id=scrapeyard.id,
             item_master_id=item.id,
             plu_code=item.plu_code,
-            item_code=canonical_item_code,
+            item_code=stored_item_code,
             item_name=item.name,
             description=item.name,
             uom=item.uom.upper(),
             quantity_sent=data.quantity,
             dispatch_method=DispatchMethod.MANUAL,
             material_state=material_state,
+            is_p_item=item.is_p_item,
             status=post_dispatch_status,
             dispatched_by=employee.id,
             dispatched_at=now,
@@ -538,6 +584,7 @@ class TransferService:
         self,
         db: Session,
         gso_id: int,
+        plant_id: Optional[int],
         data: GsoApproveRequest,
     ) -> TransferResponse:
         self.auto_approve_expired_gso(db)
@@ -545,6 +592,8 @@ class TransferService:
         transfer = db.query(Transfer).filter(Transfer.id == data.transfer_id).first()
         if not transfer:
             raise HTTPException(status_code=404, detail="Transfer not found")
+        if plant_id and transfer.shopfloor_plant_id != plant_id:
+            raise HTTPException(status_code=403, detail="Transfer not for this plant")
         if transfer.status != TransferStatus.PENDING_GSO:
             raise HTTPException(
                 status_code=400,
@@ -576,12 +625,15 @@ class TransferService:
         self,
         db: Session,
         gso_id: int,
+        plant_id: Optional[int],
         data: GsoRejectRequest,
     ) -> TransferResponse:
         employee = validate_gso_employee(db, gso_id, data.employee_id)
         transfer = db.query(Transfer).filter(Transfer.id == data.transfer_id).first()
         if not transfer:
             raise HTTPException(status_code=404, detail="Transfer not found")
+        if plant_id and transfer.shopfloor_plant_id != plant_id:
+            raise HTTPException(status_code=403, detail="Transfer not for this plant")
         if transfer.status != TransferStatus.PENDING_GSO:
             raise HTTPException(
                 status_code=400,
@@ -688,6 +740,20 @@ class TransferService:
                 created_at=now,
             )
         )
+
+        if not transfer.is_p_item:
+            inventory_service.add_stock(
+                db,
+                scrapeyard_id,
+                transfer.item_code,
+                transfer.item_name,
+                transfer.uom,
+                transfer.quantity_received,
+                InventoryMovementType.ACCEPT_NON_P,
+                "transfer",
+                transfer.id,
+            )
+
         db.commit()
         db.refresh(transfer)
         return self._build_response(db, transfer)

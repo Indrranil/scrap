@@ -13,6 +13,7 @@ class ShredLog(Base):
     input_name = Column(String(500), nullable=False)
     output_item_code = Column(String(20), nullable=False, index=True)
     output_name = Column(String(500), nullable=False)
-    quantity_kg = Column(Numeric(12, 3), nullable=False)
+    quantity_pre_shred = Column(Numeric(12, 3), nullable=False)
+    quantity_post_shred = Column(Numeric(12, 3), nullable=False)
     shredded_by = Column(Integer, ForeignKey("employee_profile.id"), nullable=False)
     shredded_at = Column(BigInteger, nullable=False, index=True)

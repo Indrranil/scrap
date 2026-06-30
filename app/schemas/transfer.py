@@ -55,13 +55,11 @@ class QRScanResponse(BaseModel):
 class DispatchRequest(BaseModel):
     qr_raw: str
     employee_id: int
-    material_state: Optional[MaterialState] = None
 
 
 class ManualDispatchRequest(BaseModel):
     item_master_id: int
     quantity: Decimal = Field(..., gt=0)
-    material_state: MaterialState
     employee_id: int
 
 
@@ -160,11 +158,15 @@ class TransferListItem(BaseModel):
     is_p_item: bool = False
     is_shreddable: bool = False
     status: TransferStatus
+    display_status: str
+    rejection_source: Optional[str] = None
+    rejection_reason: Optional[str] = None
     dispatched_at: Optional[int] = None
     processed_at: Optional[int] = None
     gso_approved_at: Optional[int] = None
     gso_auto_approved: bool = False
     gso_rejected_at: Optional[int] = None
+    gso_rejection_reason: Optional[str] = None
 
     class Config:
         from_attributes = True

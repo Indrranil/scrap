@@ -43,6 +43,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 "plant_id": token_data.get("plant_id"),
                 "scrapeyard_id": token_data.get("scrapeyard_id"),
                 "gso_id": token_data.get("gso_id"),
+                "security_id": token_data.get("security_id"),
             }
             return await call_next(request)
 

@@ -20,12 +20,13 @@ router = APIRouter(prefix="/v1/shopfloor", tags=["shopfloor"])
 
 @router.get("/items", response_model=ShopfloorItemListResponse)
 def list_manual_items(
+    uom: Optional[str] = None,
     _: bool = Depends(require_roles(["shopfloor"])),
     db: Session = Depends(get_db),
 ):
-    """List active EA items available for manual dispatch."""
+    """List active items available for manual dispatch."""
     _, items = item_master_service.list_items(
-        db, uom="EA", is_active=True, skip=0, limit=500
+        db, uom=uom, is_active=True, skip=0, limit=500
     )
     return ShopfloorItemListResponse(
         items=[
@@ -61,7 +62,7 @@ def dispatch_material_manual(
     _: bool = Depends(require_roles(["shopfloor"])),
     db: Session = Depends(get_db),
 ):
-    """Manual dispatch for EA items that cannot be weighed."""
+    """Manual dispatch for items that cannot be weighed via QR."""
     user = get_current_user(request)
     return transfer_service.dispatch_manual(db, user["plant_id"], body)
 
@@ -76,14 +77,14 @@ def list_rejected(
     _: bool = Depends(require_roles(["shopfloor"])),
     db: Session = Depends(get_db),
 ):
-    """List rejected transfers awaiting acknowledgement."""
+    """List rejected transfers (scrapeyard + GSO) awaiting acknowledgement."""
     user = get_current_user(request)
     total, items = transfer_service.list_transfers(
         db,
         shopfloor_plant_id=user["plant_id"],
         item_code=item_code,
         material_name=material_name,
-        rejected_only=True,
+        all_rejected_only=True,
         skip=(page - 1) * page_size,
         limit=page_size,
     )
@@ -98,7 +99,7 @@ def acknowledge_rejection(
     _: bool = Depends(require_roles(["shopfloor"])),
     db: Session = Depends(get_db),
 ):
-    """Acknowledge a rejected dispatch."""
+    """Acknowledge a scrapeyard-rejected dispatch."""
     user = get_current_user(request)
     return transfer_service.acknowledge(
         db, user["plant_id"], transfer_id, employee_id
@@ -115,7 +116,7 @@ def list_gso_rejected(
     _: bool = Depends(require_roles(["shopfloor"])),
     db: Session = Depends(get_db),
 ):
-    """List GSO-rejected transfers awaiting acknowledgement."""
+    """List GSO-rejected transfers awaiting acknowledgement (alias)."""
     user = get_current_user(request)
     total, items = transfer_service.list_transfers(
         db,

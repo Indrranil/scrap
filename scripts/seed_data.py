@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Seed admin, shopfloor plants, and shared scrapeyard for DigiScrapyard."""
+"""Seed admin, shopfloor plants, shared scrapeyard, security, and per-plant GSO."""
 
 import os
 import sys
@@ -18,6 +18,7 @@ from app.models.employee_profile import EmployeeProfile
 from app.models.gso import Gso
 from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
+from app.models.security import Security
 from app.services.auth import auth_service
 
 PLANTS = [
@@ -33,19 +34,21 @@ SCRAPEYARD = {
     "employees": ["Employee 1", "Employee 2"],
 }
 
-GSO = {
-    "name": "General Shift Officer",
-    "login_id": "GSO",
+SECURITY = {
+    "name": "Security Gate",
+    "login_id": "Security-1",
     "password": "1234",
     "employees": ["Employee 1", "Employee 2", "Employee 3", "Employee 4"],
 }
 
+GSO_EMPLOYEES = ["Employee 1", "Employee 2", "Employee 3", "Employee 4"]
 
-def _seed_plant(db, data: dict) -> None:
+
+def _seed_plant(db, data: dict) -> Plant:
     existing = db.query(Plant).filter(Plant.login_id == data["login_id"]).first()
     if existing:
         print(f"  Plant {data['login_id']} already exists — skipped")
-        return
+        return existing
     plant = Plant(
         code=data["code"],
         name=data["name"],
@@ -67,6 +70,7 @@ def _seed_plant(db, data: dict) -> None:
             )
         )
     print(f"  Plant {data['login_id']} created (qr_location={data['qr_location']})")
+    return plant
 
 
 def _seed_scrapeyard(db) -> None:
@@ -95,21 +99,51 @@ def _seed_scrapeyard(db) -> None:
     print(f"  Scrapeyard {SCRAPEYARD['login_id']} created")
 
 
-def _seed_gso(db) -> None:
-    existing = db.query(Gso).filter(Gso.login_id == GSO["login_id"]).first()
+def _seed_security(db) -> None:
+    existing = db.query(Security).filter(Security.login_id == SECURITY["login_id"]).first()
     if existing:
-        print(f"  GSO {GSO['login_id']} already exists — skipped")
+        print(f"  Security {SECURITY['login_id']} already exists — skipped")
+        return
+    sec = Security(
+        name=SECURITY["name"],
+        login_id=SECURITY["login_id"],
+        password_hash=hash_password(SECURITY["password"]),
+        is_active=True,
+        created_at=int(time.time()),
+    )
+    db.add(sec)
+    db.flush()
+    for name in SECURITY["employees"]:
+        db.add(
+            EmployeeProfile(
+                security_id=sec.id,
+                name=name,
+                is_active=True,
+                created_at=int(time.time()),
+            )
+        )
+    print(f"  Security {SECURITY['login_id']} created")
+
+
+def _seed_gso_for_plant(db, plant: Plant) -> None:
+    login_id = f"GSO-{plant.login_id}"
+    existing = db.query(Gso).filter(Gso.login_id == login_id).first()
+    if existing:
+        if not existing.plant_id:
+            existing.plant_id = plant.id
+        print(f"  GSO {login_id} already exists — skipped")
         return
     gso = Gso(
-        name=GSO["name"],
-        login_id=GSO["login_id"],
-        password_hash=hash_password(GSO["password"]),
+        plant_id=plant.id,
+        name=f"GSO {plant.name}",
+        login_id=login_id,
+        password_hash=hash_password("1234"),
         is_active=True,
         created_at=int(time.time()),
     )
     db.add(gso)
     db.flush()
-    for name in GSO["employees"]:
+    for name in GSO_EMPLOYEES:
         db.add(
             EmployeeProfile(
                 gso_id=gso.id,
@@ -118,7 +152,18 @@ def _seed_gso(db) -> None:
                 created_at=int(time.time()),
             )
         )
-    print(f"  GSO {GSO['login_id']} created")
+    print(f"  GSO {login_id} created for plant {plant.login_id}")
+
+
+def _migrate_legacy_gso(db) -> None:
+    legacy = db.query(Gso).filter(Gso.login_id == "GSO").first()
+    if not legacy:
+        return
+    ude = db.query(Plant).filter(Plant.login_id == "UDE").first()
+    if ude and not legacy.plant_id:
+        legacy.plant_id = ude.id
+        legacy.login_id = "GSO-UDE"
+        print("  Migrated legacy GSO login to GSO-UDE with plant UDE")
 
 
 def main():
@@ -137,14 +182,20 @@ def main():
                 raise
 
         print("Seeding plants...")
+        plants = []
         for plant_data in PLANTS:
-            _seed_plant(db, plant_data)
+            plants.append(_seed_plant(db, plant_data))
 
         print("Seeding scrapeyard...")
         _seed_scrapeyard(db)
 
-        print("Seeding GSO...")
-        _seed_gso(db)
+        print("Seeding security...")
+        _seed_security(db)
+
+        print("Seeding per-plant GSO...")
+        _migrate_legacy_gso(db)
+        for plant in plants:
+            _seed_gso_for_plant(db, plant)
 
         db.commit()
         print("Seed complete.")

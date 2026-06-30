@@ -22,6 +22,26 @@ Table scrapeyard {
   note: 'Single shared scrapeyard for all shopfloor plants'
 }
 
+Table security {
+  id int [pk, increment]
+  name varchar(255) [not null]
+  login_id varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  is_active boolean [not null]
+  created_at bigint [not null]
+  note: 'Shared security gate login'
+}
+
+Table gso {
+  id int [pk, increment]
+  plant_id int [ref: > plant.id, unique, note: 'One GSO login per plant']
+  name varchar(255) [not null]
+  login_id varchar(255) [not null, unique]
+  password_hash varchar(255) [not null]
+  is_active boolean [not null]
+  created_at bigint [not null]
+}
+
 Table admin_user {
   id int [pk, increment]
   username varchar(255) [not null, unique]
@@ -35,10 +55,12 @@ Table employee_profile {
   id int [pk, increment]
   plant_id int [ref: > plant.id]
   scrapeyard_id int [ref: > scrapeyard.id]
+  gso_id int [ref: > gso.id]
+  security_id int [ref: > security.id]
   name varchar(255) [not null]
   is_active boolean [not null]
   created_at bigint [not null]
-  note: 'Exactly one of plant_id or scrapeyard_id should be set'
+  note: 'Exactly one parent FK should be set'
 }
 
 Table item_master {
@@ -59,8 +81,15 @@ Table item_master {
 Table vendor {
   id int [pk, increment]
   name varchar(255) [not null, unique]
+  vendor_code varchar(50) [unique]
+  email varchar(255)
+  contact_person varchar(255)
+  phone varchar(50)
+  address varchar(500)
+  gst_number varchar(50)
   is_active boolean [not null]
   created_at bigint [not null]
+  updated_at bigint
 }
 
 Table vendor_item {
@@ -71,6 +100,48 @@ Table vendor_item {
   note: 'UNIQUE(vendor_id, item_id)'
 }
 
+Table material_inventory {
+  id int [pk, increment]
+  scrapeyard_id int [not null, ref: > scrapeyard.id]
+  item_code varchar(20) [not null, note: '8-digit saleable code']
+  item_name varchar(500) [not null]
+  uom varchar(10) [not null]
+  quantity_available decimal(12,3) [not null]
+  updated_at bigint [not null]
+  note: 'UNIQUE(scrapeyard_id, item_code)'
+}
+
+Table inventory_movement {
+  id int [pk, increment]
+  scrapeyard_id int [not null, ref: > scrapeyard.id]
+  item_code varchar(20) [not null]
+  movement_type varchar(30) [not null, note: 'accept_non_p|shred_output|sale_reserve|sale_release|sale_approve']
+  quantity_delta decimal(12,3) [not null]
+  reference_type varchar(30)
+  reference_id int
+  created_at bigint [not null]
+}
+
+Table material_sale {
+  id int [pk, increment]
+  scrapeyard_id int [not null, ref: > scrapeyard.id]
+  item_code varchar(20) [not null]
+  item_name varchar(500) [not null]
+  uom varchar(10) [not null]
+  vendor_id int [not null, ref: > vendor.id]
+  vehicle_number varchar(50) [not null]
+  quantity_sold decimal(12,3) [not null]
+  total_weight_kg decimal(12,3)
+  amount_inr decimal(14,2)
+  status varchar(20) [not null, note: 'pending|approved|rejected']
+  recorded_by int [not null, ref: > employee_profile.id]
+  recorded_at bigint [not null]
+  reviewed_by int [ref: > employee_profile.id]
+  reviewed_at bigint
+  rejection_comment text
+  transfer_id int [ref: > transfer.id]
+}
+
 Table transfer {
   id int [pk, increment]
   qr_raw varchar(2000)
@@ -79,7 +150,7 @@ Table transfer {
   scrapeyard_id int [ref: > scrapeyard.id]
   item_master_id int [ref: > item_master.id]
   plu_code varchar(20) [note: '4-digit PLU at dispatch']
-  item_code varchar(100) [not null, note: '8-digit canonical code']
+  item_code varchar(100) [not null, note: '8-digit canonical code or PLU for P-items']
   item_name varchar(500) [not null]
   description varchar(500)
   uom varchar(10) [not null]
@@ -90,15 +161,21 @@ Table transfer {
   tare_weight decimal(12,3)
   gross_weight decimal(12,3)
   dispatch_method varchar(10) [not null, note: 'qr|manual']
-  material_state varchar(20) [not null, note: 'shredded|not_shredded']
-  is_p_item boolean [not null, default: false, note: 'P-list item; item_code is PLU until shred log']
-  status varchar(20) [not null, note: 'pending|dispatched|accepted|rejected|acknowledged|sold']
+  material_state varchar(20) [not null, note: 'Server-derived: not_shredded for P-items, shredded for non-P']
+  is_p_item boolean [not null, default: false]
+  status varchar(20) [not null]
   dispatched_by int [ref: > employee_profile.id]
   dispatched_at bigint
   processed_by int [ref: > employee_profile.id]
   processed_at bigint
   acknowledged_by int [ref: > employee_profile.id]
   acknowledged_at bigint
+  gso_approved_by int [ref: > employee_profile.id]
+  gso_approved_at bigint
+  gso_auto_approved boolean
+  gso_rejected_by int [ref: > employee_profile.id]
+  gso_rejected_at bigint
+  gso_rejection_reason text
 }
 
 Table transfer_event {
@@ -110,7 +187,7 @@ Table transfer_event {
   employee_name varchar(255) [not null]
   quantity decimal(12,3)
   comment text
-  photo_path varchar(500) [note: 'Deferred in v1 API']
+  photo_path varchar(500)
   created_at bigint [not null]
 }
 
@@ -127,11 +204,12 @@ Table shred_log {
   id int [pk, increment]
   transfer_id int [not null, unique, ref: > transfer.id]
   scrapeyard_id int [not null, ref: > scrapeyard.id]
-  input_plu_code varchar(20) [not null, note: 'P-item PLU at arrival']
-  input_name varchar(500) [not null, note: 'P-item display name at arrival']
-  output_item_code varchar(20) [not null, note: '8-digit code after shred']
+  input_plu_code varchar(20) [not null]
+  input_name varchar(500) [not null]
+  output_item_code varchar(20) [not null]
   output_name varchar(500) [not null]
-  quantity_kg decimal(12,3) [not null]
+  quantity_pre_shred decimal(12,3) [not null]
+  quantity_post_shred decimal(12,3) [not null, note: 'Feeds material_inventory']
   shredded_by int [not null, ref: > employee_profile.id]
   shredded_at bigint [not null]
 }
@@ -145,4 +223,5 @@ Table scrap_sale {
   amount_inr decimal(14,2) [not null]
   sold_at bigint [not null]
   notes text
+  note: 'Legacy admin sales — superseded by material_sale for security flow'
 }

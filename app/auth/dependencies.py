@@ -83,3 +83,24 @@ def validate_gso_employee(
     if not employee:
         raise HTTPException(status_code=400, detail="Invalid employee for this GSO")
     return employee
+
+
+def validate_security_employee(
+    db: Session,
+    security_id: int,
+    employee_id: int,
+) -> EmployeeProfile:
+    employee = (
+        db.query(EmployeeProfile)
+        .filter(
+            EmployeeProfile.id == employee_id,
+            EmployeeProfile.security_id == security_id,
+            EmployeeProfile.is_active.is_(True),
+        )
+        .first()
+    )
+    if not employee:
+        raise HTTPException(
+            status_code=400, detail="Invalid employee for this security account"
+        )
+    return employee

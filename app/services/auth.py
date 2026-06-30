@@ -1,5 +1,5 @@
 import time
-from typing import List, Optional
+from typing import List
 
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
@@ -10,6 +10,7 @@ from app.models.employee_profile import EmployeeProfile
 from app.models.gso import Gso
 from app.models.plant import Plant
 from app.models.scrapeyard import Scrapeyard
+from app.models.security import Security
 from app.schemas.auth import EmployeeSummary, LoginRequest, LoginResponse
 
 
@@ -31,6 +32,29 @@ class AuthService:
                 admin_name=admin.name,
             )
 
+        security = (
+            db.query(Security)
+            .filter(
+                Security.login_id == request.login_id,
+                Security.is_active.is_(True),
+            )
+            .first()
+        )
+        if security and verify_password(request.password, security.password_hash):
+            employees = self._security_employees(db, security.id)
+            token = create_access_token(
+                subject=f"security:{security.id}",
+                role="security",
+                security_id=security.id,
+            )
+            return LoginResponse(
+                access_token=token,
+                role="security",
+                security_id=security.id,
+                security_name=security.name,
+                employees=employees,
+            )
+
         gso = (
             db.query(Gso)
             .filter(
@@ -41,16 +65,23 @@ class AuthService:
         )
         if gso and verify_password(request.password, gso.password_hash):
             employees = self._gso_employees(db, gso.id)
+            plant_name = None
+            if gso.plant_id:
+                plant = db.query(Plant).filter(Plant.id == gso.plant_id).first()
+                plant_name = plant.name if plant else None
             token = create_access_token(
                 subject=f"gso:{gso.id}",
                 role="gso",
                 gso_id=gso.id,
+                plant_id=gso.plant_id,
             )
             return LoginResponse(
                 access_token=token,
                 role="gso",
                 gso_id=gso.id,
                 gso_name=gso.name,
+                plant_id=gso.plant_id,
+                plant_name=plant_name,
                 employees=employees,
             )
 
@@ -131,6 +162,19 @@ class AuthService:
             db.query(EmployeeProfile)
             .filter(
                 EmployeeProfile.gso_id == gso_id,
+                EmployeeProfile.is_active.is_(True),
+            )
+            .all()
+        )
+        return [EmployeeSummary(id=e.id, name=e.name) for e in rows]
+
+    def _security_employees(
+        self, db: Session, security_id: int
+    ) -> List[EmployeeSummary]:
+        rows = (
+            db.query(EmployeeProfile)
+            .filter(
+                EmployeeProfile.security_id == security_id,
                 EmployeeProfile.is_active.is_(True),
             )
             .all()

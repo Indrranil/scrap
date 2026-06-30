@@ -13,6 +13,7 @@ from app.schemas.vendor import (
     VendorItemResponse,
     VendorItemUpdate,
     VendorResponse,
+    VendorSummaryResponse,
     VendorUpdate,
 )
 
@@ -20,6 +21,9 @@ from app.schemas.vendor import (
 class VendorService:
     def _to_vendor_response(self, vendor: Vendor) -> VendorResponse:
         return VendorResponse.model_validate(vendor)
+
+    def _to_vendor_summary(self, vendor: Vendor) -> VendorSummaryResponse:
+        return VendorSummaryResponse.model_validate(vendor)
 
     def _to_vendor_item_response(
         self, db: Session, vendor_item: VendorItem
@@ -38,6 +42,37 @@ class VendorService:
             rate_inr=vendor_item.rate_inr,
         )
 
+    def _apply_vendor_fields(self, vendor: Vendor, data, *, is_create: bool = False) -> None:
+        now = int(time.time())
+        if is_create:
+            vendor.created_at = now
+        vendor.updated_at = now
+        if hasattr(data, "name") and data.name is not None:
+            vendor.name = data.name.strip()
+        if hasattr(data, "vendor_code") and data.vendor_code is not None:
+            vendor.vendor_code = data.vendor_code.strip() or None
+        if hasattr(data, "email"):
+            vendor.email = data.email
+        if hasattr(data, "contact_person"):
+            vendor.contact_person = data.contact_person
+        if hasattr(data, "phone"):
+            vendor.phone = data.phone
+        if hasattr(data, "address"):
+            vendor.address = data.address
+        if hasattr(data, "gst_number"):
+            vendor.gst_number = data.gst_number
+
+    def _check_unique_vendor_code(
+        self, db: Session, vendor_code: Optional[str], exclude_id: Optional[int] = None
+    ) -> None:
+        if not vendor_code:
+            return
+        query = db.query(Vendor).filter(Vendor.vendor_code == vendor_code)
+        if exclude_id:
+            query = query.filter(Vendor.id != exclude_id)
+        if query.first():
+            raise HTTPException(status_code=409, detail="Vendor code already exists")
+
     def list_vendors(
         self, db: Session, search: Optional[str] = None
     ) -> List[VendorResponse]:
@@ -46,6 +81,15 @@ class VendorService:
             query = query.filter(Vendor.name.ilike(f"%{search}%"))
         vendors = query.order_by(Vendor.name.asc()).all()
         return [self._to_vendor_response(v) for v in vendors]
+
+    def list_vendor_summaries(self, db: Session) -> List[VendorSummaryResponse]:
+        vendors = (
+            db.query(Vendor)
+            .filter(Vendor.is_active.is_(True))
+            .order_by(Vendor.name.asc())
+            .all()
+        )
+        return [self._to_vendor_summary(v) for v in vendors]
 
     def get_vendor(self, db: Session, vendor_id: int) -> VendorResponse:
         vendor = (
@@ -61,11 +105,9 @@ class VendorService:
         name = data.name.strip()
         if db.query(Vendor).filter(Vendor.name == name).first():
             raise HTTPException(status_code=409, detail="Vendor already exists")
-        vendor = Vendor(
-            name=name,
-            is_active=True,
-            created_at=int(time.time()),
-        )
+        self._check_unique_vendor_code(db, data.vendor_code)
+        vendor = Vendor(name=name, is_active=True)
+        self._apply_vendor_fields(vendor, data, is_create=True)
         db.add(vendor)
         db.commit()
         db.refresh(vendor)
@@ -87,8 +129,23 @@ class VendorService:
             if existing:
                 raise HTTPException(status_code=409, detail="Vendor name already exists")
             vendor.name = name
+        if data.vendor_code is not None:
+            code = data.vendor_code.strip() or None
+            self._check_unique_vendor_code(db, code, exclude_id=vendor_id)
+            vendor.vendor_code = code
+        if data.email is not None:
+            vendor.email = data.email
+        if data.contact_person is not None:
+            vendor.contact_person = data.contact_person
+        if data.phone is not None:
+            vendor.phone = data.phone
+        if data.address is not None:
+            vendor.address = data.address
+        if data.gst_number is not None:
+            vendor.gst_number = data.gst_number
         if data.is_active is not None:
             vendor.is_active = data.is_active
+        vendor.updated_at = int(time.time())
         db.commit()
         db.refresh(vendor)
         return self._to_vendor_response(vendor)
@@ -98,6 +155,7 @@ class VendorService:
         if not vendor:
             raise HTTPException(status_code=404, detail="Vendor not found")
         vendor.is_active = False
+        vendor.updated_at = int(time.time())
         db.commit()
         db.refresh(vendor)
         return self._to_vendor_response(vendor)
