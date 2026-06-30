@@ -103,56 +103,80 @@ def _seed_security(db) -> None:
     existing = db.query(Security).filter(Security.login_id == SECURITY["login_id"]).first()
     if existing:
         print(f"  Security {SECURITY['login_id']} already exists — skipped")
-        return
-    sec = Security(
-        name=SECURITY["name"],
-        login_id=SECURITY["login_id"],
-        password_hash=hash_password(SECURITY["password"]),
-        is_active=True,
-        created_at=int(time.time()),
-    )
-    db.add(sec)
-    db.flush()
-    for name in SECURITY["employees"]:
-        db.add(
-            EmployeeProfile(
-                security_id=sec.id,
-                name=name,
-                is_active=True,
-                created_at=int(time.time()),
-            )
+        sec = existing
+    else:
+        sec = Security(
+            name=SECURITY["name"],
+            login_id=SECURITY["login_id"],
+            password_hash=hash_password(SECURITY["password"]),
+            is_active=True,
+            created_at=int(time.time()),
         )
-    print(f"  Security {SECURITY['login_id']} created")
+        db.add(sec)
+        db.flush()
+        print(f"  Security {SECURITY['login_id']} created")
+
+    emp_count = (
+        db.query(EmployeeProfile)
+        .filter(EmployeeProfile.security_id == sec.id)
+        .count()
+    )
+    if emp_count == 0:
+        for name in SECURITY["employees"]:
+            db.add(
+                EmployeeProfile(
+                    security_id=sec.id,
+                    name=name,
+                    is_active=True,
+                    created_at=int(time.time()),
+                )
+            )
 
 
 def _seed_gso_for_plant(db, plant: Plant) -> None:
     login_id = f"GSO-{plant.login_id}"
-    existing = db.query(Gso).filter(Gso.login_id == login_id).first()
+    existing = (
+        db.query(Gso)
+        .filter(
+            (Gso.login_id == login_id) | (Gso.plant_id == plant.id)
+        )
+        .first()
+    )
     if existing:
         if not existing.plant_id:
             existing.plant_id = plant.id
+        if existing.login_id != login_id:
+            existing.login_id = login_id
         print(f"  GSO {login_id} already exists — skipped")
-        return
-    gso = Gso(
-        plant_id=plant.id,
-        name=f"GSO {plant.name}",
-        login_id=login_id,
-        password_hash=hash_password("1234"),
-        is_active=True,
-        created_at=int(time.time()),
-    )
-    db.add(gso)
-    db.flush()
-    for name in GSO_EMPLOYEES:
-        db.add(
-            EmployeeProfile(
-                gso_id=gso.id,
-                name=name,
-                is_active=True,
-                created_at=int(time.time()),
-            )
+        gso = existing
+    else:
+        gso = Gso(
+            plant_id=plant.id,
+            name=f"GSO {plant.name}",
+            login_id=login_id,
+            password_hash=hash_password("1234"),
+            is_active=True,
+            created_at=int(time.time()),
         )
-    print(f"  GSO {login_id} created for plant {plant.login_id}")
+        db.add(gso)
+        db.flush()
+        print(f"  GSO {login_id} created for plant {plant.login_id}")
+
+    emp_count = (
+        db.query(EmployeeProfile)
+        .filter(EmployeeProfile.gso_id == gso.id)
+        .count()
+    )
+    if emp_count == 0:
+        for name in GSO_EMPLOYEES:
+            db.add(
+                EmployeeProfile(
+                    gso_id=gso.id,
+                    name=name,
+                    is_active=True,
+                    created_at=int(time.time()),
+                )
+            )
 
 
 def _migrate_legacy_gso(db) -> None:
@@ -163,6 +187,7 @@ def _migrate_legacy_gso(db) -> None:
     if ude and not legacy.plant_id:
         legacy.plant_id = ude.id
         legacy.login_id = "GSO-UDE"
+        db.flush()
         print("  Migrated legacy GSO login to GSO-UDE with plant UDE")
 
 
